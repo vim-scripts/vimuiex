@@ -1,0 +1,248 @@
+*vimuiex.txt*        User Interface Extensions         Last Change: April 2009
+
+User Interface Extensions (Experiment)
+			  Version 0.1
+
+|vimuiex-installation| Installation
+|vimuiex-vxbuflist|    Popup buffer explorer
+|vimuiex-vxtextmenu|   Popup menu navigator
+|vimuiex-pythonlib|    Python library usage
+|vimuiex-testing|      TESTING
+
+For Vim version 7.2 and above.
+Requires python interface.
+
+==============================================================================
+INSTALLATION						*vimuiex-installation*
+
+To install:
+  - Download the vimuiex.zip.
+  - Extract the zip archive into your runtime directory.
+  - Start Vim or goto an existing instance of Vim.
+  - Execute the following command:
+>
+      :helptag <your runtime directory>/doc
+<
+    This will generate all the help tags for any file located in the doc
+    directory.
+
+Install script http://www.vim.org/scripts/script.php?script_id=1863
+
+Linux: to use in gvim, python wxwidgets package must be installed. The name of 
+the debian package is python-wxgtk2.8. 
+
+Windows: install Python (http://www.python.org) and wxPython 
+(http://www.wxpython.org). GVim 7.2 requires Python 2.4.
+
+==============================================================================
+POPUP BUFFER EXPLORER					   *vimuiex-vxbuflist*
+
+Displays a list of buffers in an overlapping window. In terminal the window is 
+displayed using the curses library and is modal. In vim-gui the window is 
+created using the wxWidgets library and is non-modal.
+
+Some keys may not work in terminal mode (eg. <home>, <end>).
+
+To start use: >
+  :call VxBufListSelect()
+<
+To bind to a key use: >
+  noremap <silent> <F3> :call VxBufListSelect()<cr>
+<
+				       *vimuiex-navigation*
+You can navigate the items in the list with the following keys:
+   j, <down>	     next
+   k, <up>	     previous
+   h, <left>	     shift left
+   l, <right>	     shift right
+   n, <pgdown>	     page down
+   p, <pgup>	     page up
+   0, gg, <home>     top of list
+   $, G, <end>	     bottom of list
+   f, /		     enter filtering mode
+   q, <Esc>	     close the list without selection
+   <CR>		     select the current item and execute a command
+   wh, wj, wk, wl    move window to border
+   wc, wv, wC        center window
+
+				       *vimuiex-filtering-mode*
+In filtering mode new ASCII characters are added to the filter and only the 
+items that match the filter are displayed. First the items that start with the 
+filter string are displayed followed by the items that contain the filter 
+string elsewhere. In filtering mode the following keys can be used:
+
+   <Esc>	     clear the filter and exit filtering mode
+   <CR>		     exit filtering mode and keep the filter string
+   <BS>		     remove the last character from the filter string
+
+(TODO: new keys can be added to the popup list keymap)
+
+==============================================================================
+POPUP MENU NAVIGATOR				          *vimuiex-vxtextmenu*
+
+Displays a list of top-level menus in a popup listbox. 
+
+To start use: >
+  :call VxTextMenu()
+<
+To bind to a key use: >
+  noremap <silent> <F10> :call VxTextMenu()<cr>
+<
+Note: (GVim) if the gui menu is visible, F10 will activate that menu so the 
+text menu has to be bound to another key.
+
+The menu can be navigated with the following keys:
+   j, <down>	     next
+   k, <up>	     previous
+   h, <left>	     shift left
+   l, <right>	     shift right
+   n, <pgdown>	     page down
+   p, <pgup>	     page up
+   0, gg, <home>     top of list
+   $, G, <end>	     bottom of list
+   f, /		     enter filtering mode (see |vimuiex-filtering-mode|)
+   &                 enter/exit menu shortcut navigation mode (not in wx)
+   q, <Esc>	     close the list without selection
+   <CR>		     select the current menu item and execute the assigned 
+		     command or display a submenu
+   <BS>		     Display parent menu
+   wh, wj, wk, wl    move window to border
+   wc, wv, wC        center window
+
+Mouse commands:
+   <LeftMouse>	     Select menu
+   <RightMouse>      Display parent menu
+
+Note: Mouse commands only work when the mouse pointer is on a menu item.
+
+Note: The menu initially starts with menu shortcuts enabled. To disable them 
+and enter normal listbox navigation mode, press '&'.
+
+==============================================================================
+PYTHON LIBRARY USAGE				          *vimuiex-pythonlib*
+
+
+Example: Display a list of buffers		       *vimuiex-list-example*
+
+1. Prepare python so that it will load modules from ~/.vim/modpython: 
+>
+  call modpython#prepare()
+<
+It is best to add this call to every function that is exported from the script 
+and uses python modules installed in modpython. This way python won't be used 
+when it is not needed.
+
+2. Prepare a list of buffers and store them to a global vim list variable: 
+>
+    redir => bflst
+    exec 'silent ls'
+    redir END
+    let g:VXBUFLIST_bufnames = split(bflst, '\n')
+<
+3. Use python to load and display the list:
+>
+  python << EOF
+  import vim
+  import vimuiex.popuplist as lister
+<
+  Create a CList object and load the items from the global variable into the 
+  list. The strings from the list will be converted to unicode using the 
+  |encoding| setting. The tabs in list items are used to separate the columns 
+  of the list. To set the initial position of the window see 
+  |vimuiex-python-position|.
+>
+  List = lister.CList(title="Buffers")
+  List.loadVimItems("g:VXBUFLIST_bufnames")
+<
+  Set the callback function that will be used when an item is selected 
+  (cmdAccept). The function must be global. The placeholder "{{i}}" will be 
+  converted to the index of the selected item. Another callback function can 
+  be defined in case some action should be taken when selection from the list 
+  is aborted (cmdCancel).
+>
+  List.cmdAccept = "call VXBUFLIST_cb_selectitem({{i}})"
+  List.cmdCancel = ""
+<
+  Process the list. The initially selected item can be set. This can be useful 
+  if the buffer list is in MRU order. Setting curindex to 1 will select the 
+  alternate buffer.
+
+  In the curses implementation process() will exit after the list processing 
+  has finished. In the wx implementation it will exit immediately.
+>
+  List.process(curindex=1)
+<
+  Remove the refeence to the List variable. This may free some memory used by 
+  python. The List variable is defined globally and remain in memory between 
+  calls to python. In wx implementation the memory will be freed only after 
+  the window with the list is closed.
+>
+  List=None
+  EOF
+<
+4. Define the callback function
+>
+  function! VXBUFLIST_cb_selectitem(index)
+     let txt = g:VXBUFLIST_bufnames[a:index]
+     exec "echo \'" . txt . "\'"
+  endfunc
+<
+See also code in: vxbuflist.vim, vxtextmenu.vim, vxrecentfile.vim
+
+
+Global python variables				  *vimuiex-python-global-vars*
+
+Some global variables are used by the subsystem that displays the listbox.  
+These are defined in modules 'modpython.globals.*'.
+
+The curses implementation defines a global screen variable that is used to 
+access some curses functions (eg. getch). Curses initialization is done only 
+the first time gcurses.vimPrepareScreen() is called. The function also returns 
+a reference to the global screen variable.
+
+The wx implementation creates a global application variable which can be 
+obtained with the function gwx.vimPrepareWx().
+
+
+Initial position of the window			  *vimuiex-python-position*
+
+When creating a CList or CTextMenu the size and position of the popup listbox 
+can be specified as construction parameters:
+
+   position: (x, y); if None, center the listbox
+   align:    alignment string (eg. "TL", "BR", "T", ...); overrides position
+   size:     (width, height); if None, half of screen size in each direction
+   autosize: autosize string (eg. "V", "H", "VH")
+
+For example a menu constructed with:
+>
+   Menu = menu.CTextMenu(align="TL", autosize="VH")
+<
+will place the menu at the top-left corner of the vim screen and autosize the 
+menu in the vertical and horizontal direction.
+
+==============================================================================
+TESTING							     *vimuiex-testing*
+
+The library is experimental. It was tested on this configurations:
+
+Linux
+   * kubuntu 8.10
+   * kubuntu 9.04 (patch for ubuntu-python25-curses required)
+      see: https://bugs.launchpad.net/ubuntu/+source/python2.5/+bug/369203
+   * python 2.5, python 2.6
+   * gvim + wx ( python wx.version()='2.8.8.0 (gtk2-unicode)' )
+   * vim + curses ( python curses.version=2.2 )
+   * terminals:
+      * working: konsole, xterm, aterm, eterm, rxvt, gnome-terminal; all in
+	color mode
+      * xvt (monochrome)
+
+Windows
+   * XP
+   * gvim
+   * python 2.4
+   * wxpython (2.8.9.2)
+
+vim:tw=78:noet:wrap:ts=8:ft=help:norl:
+
