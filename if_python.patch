@@ -1,0 +1,129 @@
+Index: vim7/src/if_python.c
+===================================================================
+--- vim7/src/if_python.c	(revision 1493)
++++ vim7/src/if_python.c	(working copy)
+@@ -2234,6 +2234,104 @@
+     return NULL;
+ }
+ 
++
++/* Screen object - Definitions
++ */
++
++typedef struct
++{
++    PyObject_HEAD
++}
++ScreenObject;
++
++static PyObject * ScreenGetattr(PyObject *self, char *name);
++static PyObject * ScreenPuts(PyObject *self, PyObject *args);
++static PyObject * ScreenGetHighlightAttr(PyObject *self, PyObject *args);
++
++static struct PyMethodDef ScreenMethods[] = {
++    /* name,	    function,		calling,    documentation */
++    {"puts",	     ScreenPuts,	METH_VARARGS,	    "row, col, attr, str, len=-1" },
++    {"getHighlightAttr", ScreenGetHighlightAttr, METH_VARARGS, "name" },
++    { NULL,	    NULL,		0,	    NULL }
++};
++
++static PyTypeObject ScreenType = {
++    PyObject_HEAD_INIT(0)
++    0,
++    "screen",
++    sizeof(ScreenObject),
++    0,
++
++    (destructor)    0,			/* tp_dealloc,	refcount==0  */
++    (printfunc)     0,			/* tp_print,	print x      */
++    (getattrfunc)   ScreenGetattr,			/* tp_getattr,	x.attr	     */
++    (setattrfunc)   0,			/* tp_setattr,	x.attr=v     */
++    (cmpfunc)	    0,			/* tp_compare,	x>y	     */
++    (reprfunc)	    0,			/* tp_repr,	`x`, print x */
++
++    0,  /* as number */
++    0,  /* as sequence */
++    0,  /* as mapping */
++
++    (hashfunc) 0,			/* tp_hash, dict(x) */
++    (ternaryfunc) 0,			/* tp_call, x()     */
++    (reprfunc) 0,			/* tp_str,  str(x)  */
++};
++
++/* Screen object - Implementation
++ */
++
++    static PyObject *
++ScreenGetattr(PyObject *self, char *name)
++{
++#ifdef FEAT_MOUSE
++   if (strcmp(name, "mousex") == 0)
++      return Py_BuildValue("l", (long)(mouse_col));
++   if (strcmp(name, "mousey") == 0)
++      return Py_BuildValue("l", (long)(mouse_row));
++#endif
++   return Py_FindMethod(ScreenMethods, self, name);
++}
++
++    static PyObject *
++ScreenPuts(PyObject *self, PyObject *args)
++{
++    char_u *str;
++    int row, col, attr;
++    int len = -1;
++
++    if (!PyArg_ParseTuple(args, "iiis|i", &row, &col, &attr, &str, &len))
++        return NULL;
++
++    Py_BEGIN_ALLOW_THREADS
++    Python_Lock_Vim();
++    screen_puts_len(str, len, row, col, attr);
++    Python_Release_Vim();
++    Py_END_ALLOW_THREADS
++
++    Py_INCREF(Py_None);
++    return Py_None;
++}
++
++    static PyObject *
++ScreenGetHighlightAttr(PyObject *self, PyObject *args)
++{
++    char_u *name;
++    int id, attr;
++
++    if (!PyArg_ParseTuple(args, "s", &name))
++        return NULL;
++
++    Py_BEGIN_ALLOW_THREADS
++    Python_Lock_Vim();
++    id = syn_name2id(name);
++    attr = syn_id2attr(id);
++    Python_Release_Vim();
++    Py_END_ALLOW_THREADS
++
++    return Py_BuildValue("l", (long)attr);
++}
++
+ /* Current items object - Definitions
+  */
+ 
+@@ -2342,6 +2440,11 @@
+     PyObject_HEAD_INIT(&WinListType)
+ };
+ 
++static ScreenObject TheScreen =
++{
++    PyObject_HEAD_INIT(&ScreenType)
++};
++
+ static CurrentObject TheCurrent =
+ {
+     PyObject_HEAD_INIT(&CurrentType)
+@@ -2375,6 +2478,7 @@
+     PyDict_SetItemString(dict, "buffers", (PyObject *)(void *)&TheBufferList);
+     PyDict_SetItemString(dict, "current", (PyObject *)(void *)&TheCurrent);
+     PyDict_SetItemString(dict, "windows", (PyObject *)(void *)&TheWindowList);
++    PyDict_SetItemString(dict, "screen", (PyObject *)(void *)&TheScreen);
+ 
+     if (PyErr_Occurred())
+ 	return -1;

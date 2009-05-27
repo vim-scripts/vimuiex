@@ -1,0 +1,70 @@
+This is a mirror of http://www.vim.org/scripts/script.php?script_id=2606
+
+Vim user interface extension
+
+requires: VxLib (vimscript#3061)
+
+The plugin implements a popup listbox (an overlapping window). The listbox can display an array of stirng items and can be navigated with the usual Vim keys. The list can be narrowed by interactively applying a filter.
+
+The listbox is available in console when Vim is built with "+python" and the Python curses library is available. For GVim a patch that adds the feature "+python_screen" is required (see below).
+
+Screenshots: http://vimuiex.sourceforge.net/screenshot/tvimmenu.png.html 
+
+The commands defined by the plugin are listed below. When a popup listbox appears, you can pres F1 to display the list of keys/commands that are active in the listbox. You can always close a listbox with Esc or q in default mode. The basic operation is described at:
+http://vimuiex.sourceforge.net/vimdoc/vimuiex.html#vimuiex-operation
+
+Opening files, selecting buffers:
+   * VxBufListSelect:
+     Buffer explorer/manager.
+     http://vimuiex.sourceforge.net/vimdoc/vimuiex_plugins.html#vimuiex-vxbuflistselect;
+   * VxOpenRecentFile:
+     Display a list of recent files, open selected file.
+   * VxFileBrowser:
+     Browse the local filesystem to open some files.  Recent directory list is available to find files faster.
+   * VxFileFilter:
+     Display a list of files in current directory and subdirectories to a certain depth to open some files.
+
+Finding text:
+   * VxOccurRegex:
+     Display all occurences of a string in the listbox. The search range can be a buffer, a directory or a directory with its subdirectories. Uses vimgrep or external grep for directory searches.
+     http://vimuiex.sourceforge.net/vimdoc/vimuiex_plugins.html#vimuiex-vxoccur;
+   * VxOccurCurrent:
+     Capture output from [I and show it in the listbox.
+   * VxOccurTags:
+     Process current file with ctags, show results in the listbox.
+   * VxOccurRutines:
+     Display the lines that match a predefined regular expression for current filetype. Example implementations for: Vim, Python, D, LaTeX, BibTex, Html, Slice.
+   * VxSourceTasks:
+     Display TODO/Task items in source files. The search range can be defined like with VxOccurRegex.
+   
+   Every command in this section stores its results in vxoccur history. A recent set of search results can be activated with :VxOccurSelectHist without running an expensive search command again.The commands :VxCPrev and :VxCNext select items while the list is closed. The command :VxOccurHist redisplays the active list.
+
+   A helper plugin VxMap enables a faster navigation through the list of results (and also the following: buffers, tabs, errorlist, locationlist).
+   http://vimuiex.sourceforge.net/vimdoc/vimuiex_plugins.html#vimuiex-vxmap;
+
+Extended builtin commands:
+   * VxTextMenu:
+     Display the Vim menu in the listbox, select items from menu.
+   * VxDisplay:
+     Display the output of :display, insert or execute selected register.
+   * VxMarks:
+     Display the output of :marks, jump to mark
+   * VxCmd:
+     Display the output of any command in a listbox
+   * The file vxcmdhist.vim:
+     Implements a function that displays the command line history in a listbox when PgUp is pressed
+
+Moving around:
+   Commands require "+python_screen" (download the patch below):
+   * VxLineJump:
+     Display lables in the line-number area and jump to selected label.
+   * VxWindowJump:
+     Display a label in the center of every window and jump to selected window.
+
+Links:
+
+Patch and prebuilt binaries: http://sourceforge.net/projects/vimuiex/files/
+Detailed descriptions: http://vimuiex.sourceforge.net/plugins.html
+Example keymap: http://vimuiex.sourceforge.net/vimmapexmpl.html
+
+
