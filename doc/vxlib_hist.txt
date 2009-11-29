@@ -1,0 +1,49 @@
+*vxlib_hist.txt*          History Utilities          Last Change: October 2009
+
+==============================================================================
+HISTORY                                                        *vxlib-history*
+
+Use multiple histories with |input()| command.
+
+This module implements functions to save and restore the history used by the 
+input() command. New types of histories can be defined by the user. Custom 
+histories are also saved to .viminfo.
+
+Example: Substitute command with separate histories for search patterns and 
+replacement strings
+>
+   function! Substitute()
+      call inputsave()
+      " save the content of 'input' history
+      let hinp = vxlib#hist#GetHistory('input')
+
+      " use 'search' history in input command (copy from 'search' to 'input')
+      call vxlib#hist#CopyHistory('search', 'input')
+      let l:patt = input("Find:/")
+      call vxlib#hist#AddHistory('search', l:patt)   " same effect as histadd()
+
+      " use custom 'replace' history in input command
+      call vxlib#hist#CopyHistory('replace', 'input') 
+      let l:repl = input("Repl:/")
+      call vxlib#hist#AddHistory('replace', l:repl)  " add to custom history
+
+      " restore the content of the 'input' history
+      call vxlib#hist#SetHistory('input', l:hinp) " restore
+
+      " execute the search
+      call inputrestore()
+      let l:cmd = "s/" . escape(l:patt, "/") . "/" . escape(l:repl, "/") . "/"
+      exec l:cmd
+   endfunc
+<
+
+Initialization/Termination:
+   - s:UserHistory (a dictionary of lists) will be restored from 
+     g:CUSTOM_HISTORIES the first time vxlib#hist# is used
+   - at the same time a VimLeavePre autocmd will be registered and the history 
+     will be saved to g:CUSTOM_HISTORIES before writing the viminfo file
+   - if vxlib#hist# isn't used in a session, g:CUSTOM_HISTORIES remains 
+     unchanged (if it was present in viminfo).
+
+
+## vim:tw=78:noet:wrap:ts=8:ft=help:norl:

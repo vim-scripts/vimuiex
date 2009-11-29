@@ -1,4 +1,4 @@
-# vim: set fileencoding=utf-8 sw=4 ts=8 et:
+# vim: set fileencoding=utf-8 sw=4 ts=8 et:vim
 # _popuplist_screen.py - a popup listbox implementation with vim internal screen routines
 # NOTE: requires a vim source patch to export a vim.screen object to python.
 #
@@ -12,110 +12,70 @@
 import time
 import vim
 import simplekeymap
-screen = vim.screen
+import ioutil
 
 def log(msg):
     f = open ("testlog.txt", "a")
     f.write(msg + "\n")
     f.close()
 
-LINECHARS = {
-    "ascii":   u"-|++++",
-    "single":  u"─│┌┐└┘",
-    "double":  u"═║╔╗╚╝",
-    "mixed1":  u"─║╓╖╙╜",
-    "mixed2":  u"═│╒╕╘╛"
-}
+# Factory
+def createListboxView(position, size):
+    if ioutil.PLATFORM == "vim.screen":
+        return CPopupListboxScreen(position, size)
+    if ioutil.PLATFORM == "curses":
+        return CPopupListboxCurses(position, size)
+    return None
 
-class CWindow(object):
-    def __init__(self, height, width, y, x):
-        self.height = height
-        self.width = width
-        self.y = y
-        self.x = x
-        self.attr = 0
-        self.lasty = 0
-        enc = vim.eval("&encoding") # enc = "utf-8"
-        try:
-            uchars = LINECHARS["double"]
-            chars = uchars.encode(enc) # check if encoding works; exception if not
-            self.linechars = [ ch.encode(enc) for ch in uchars ]
-        except:
-            self.linechars = [ ch.encode("ascii") for ch in LINECHARS["ascii"] ]
+class CNumSelect(object):
+    # TODO: use arbitrary characters; multiple character groups (first press, second press)
+    # TODO: char 2 digit mapping is customizable (vim setting)
+    # TODO: use this code in vxjump
+    def __init__(self):
+        self.curNumber = ""
+        self.maxnumber = 9
+        self.width = 1
+        self.format = "%1d"
 
-    def bkgd(self, char, attr):
-        line = char[0] * self.width
-        for i in xrange(self.height):
-            screen.puts(i + self.y, self.x, attr, line)
-        self.lasty = self.height
+    def setMaxNumber(self, maxnumber):
+        self.maxnumber = maxnumber
+        if maxnumber > 99: self.width = 3
+        elif maxnumber > 9: self.width = 2
+        else: maxnumber = 1
+        self.format = "%%0%dd" % self.width
 
-    def attrset(self, attr):
-        self.attr = attr
+    def getCurIndex(self):
+        if self.curNumber == "": return -1
+        cn = self.curNumber
+        while len(cn) < self.width: cn = cn + "0"
+        i = int(cn)
+        if i > self.maxnumber: i = -1
+        return i
 
-    def border(self):
-        if self.width < 2 or self.height < 2: return
-        line = self.linechars[2] + self.linechars[0] * (self.width - 2) + self.linechars[3]
-        self.addstr(0, 0, line)
-        line = self.linechars[4] + self.linechars[0] * (self.width - 2) + self.linechars[5]
-        self.addstr(self.height-1, 0, line)
-        self.vline(1, 0, self.linechars[1],  self.height-2)
-        self.vline(1, self.width-1, self.linechars[1], self.height-2)
-        pass
+    def isComplete(self):
+        return len(self.curNumber) >= self.width
 
-    # used only before drawing items so that clrtobot works ok
-    def move(self, y, x):
-        self.lasty = y - 1 # FIXME: = y when clrtobot will be ok (will consider x)
-
-    def hline(self, y, x, char, length):
-        if length < 1: return
-        line = char * length
-        self.addstr(y, x, line)
-        self.lasty = y
-        pass
-
-    def vline(self, y, x, char, length):
-        for ll in xrange (y, y+length):
-            self.addstr(ll, x, char)
-        pass
-
-    def redrawwin(self):
-        pass
-
-    def redrawln(self, y, unknown_todo):
-        pass
-
-    def refresh(self):
-        pass
-
-    def clear(self):
-        pass
-
-    def clrtobot(self):
-        if self.lasty+1 < self.height:
-            line = " " * self.width
-            for y in xrange(self.lasty+1, self.height):
-                self.addstr(y, 0, line)
-        pass
-
-    def derwin(self, height, width, y, x):
-        return CWindow(height, width, self.y + y, self.x + x)
-
-    def addstr(self, y, x, line, attr=None):
-        if attr == None: attr = self.attr
-        screen.puts(y + self.y, x + self.x, attr, line)
-        self.lasty = y
-
-    def insstr(self, y, x, line, attr=None):
-        self.addstr(y, x, line, attr)
-
-    def enclose(self, y, x):
-        return y >= self.y and y < self.y + self.width and x >= self.x and x < self.x + self.height
+    def trySelectItem(self, ch, topitem, lastitem):
+        # TODO: setMaxNumber should be set here. Possible conflicts with filter/navigation?
+        oldn = self.curNumber
+        if ch in "0123456789": self.curNumber += ch
+        else:
+            pos = "mjkluio".find(ch) # TODO: user setting
+            if pos >= 0: self.curNumber += "%c" % (pos+48)
+            else: return -1
+        offs = self.getCurIndex()
+        i = offs + topitem
+        if offs < 0 or i < 0 or i > lastitem:
+            self.curNumber = oldn
+            return -1
+        return i
 
 class CPopupListbox(object):
     EXIT = 0
     NORMAL = 1
     FILTER = 2
     QUICK = 3
+    NUMSELECT = 4
     def __init__(self, position, size): # TODO: CWinArranger
         self.itemlist = None # CList
         self.left = position[0]
@@ -132,20 +92,14 @@ class CPopupListbox(object):
         self.exitcommand = ""
         self.keyboardMode = CPopupListbox.NORMAL
         self.quickChar = None # Currently active quick char
+        self.numselect = CNumSelect()
+        self.numselect.setMaxNumber(self.lastline)
         self.yPrompt = int(vim.eval("&lines")) - 1
         self.lastclick = (-1, -1) # last mouse click
         self.initColors()
 
     def initColors(self):
-        try:
-            self.coNormal = vim.screen.getHighlightAttr("VxNormal")
-            self.coSelected = vim.screen.getHighlightAttr("VxSelected")
-            self.coHilight = vim.screen.getHighlightAttr("VxQuickChar")
-            if self.coNormal == self.coSelected: raise
-        except:
-            self.coNormal = 1
-            self.coSelected = 0
-            self.coHilight = 3
+        pass
 
     @property
     def itemCount(self):
@@ -162,9 +116,10 @@ class CPopupListbox(object):
     def initWindow(self):
         self.textwidth = self.width - 2
         self.lastline = self.height - 3
+        self.numselect.setMaxNumber(self.lastline)
         self.topindex = 0
         self.hoffset = 0
-        self.window = CWindow(self.height, self.width, self.top, self.left)
+        self.window = ioutil.CWindow(self.height, self.width, self.top, self.left)
         self.wcontent = self.window.derwin(self.height-2, self.width-2, 1, 1)
 
     def show(self, curindex=None):
@@ -201,22 +156,36 @@ class CPopupListbox(object):
             w.clear()
             w.refresh()
             del w
-        # stdscr.refresh()
+        ioutil.CScreen().refresh()
         vim.command("redraw!")
 
-    def getLineStr(self, text):
+    def redraw(self):
+        self.show()
+
+    def getLineStr(self, text, lineno):
         if text.find("\t") >= 0:
             cw = self.itemlist.getFirstColumnWidth(self.textwidth)
             if cw != None:
                 cols = text.split("\t", 1)
                 text = "%*s %s" % (-cw, cols[0].rstrip(), cols[1].lstrip())
             text = text.expandtabs(8)
-        w = self.textwidth
+        w = self.textwidth # - 1
         if self.hoffset > 0:
-            w -= 1
-            line = "<%*s" % (-w, text[self.hoffset:self.hoffset+w])
+            w -= 2
+            line = u"< %*s" % (-w, text[self.hoffset:self.hoffset+w])
         else:
-            line = "%*s" % (-w, text[self.hoffset:self.hoffset+w])
+            if self.keyboardMode == CPopupListbox.NUMSELECT:
+                w -= (self.numselect.width + 1)
+                lnstr = self.numselect.format % lineno
+                line = u"%s %*s" % (lnstr, -w, text[self.hoffset:self.hoffset+w])
+            else:
+                line = u"%*s" % (-w, text[self.hoffset:self.hoffset+w])
+        # TODO: text should be preprocessed to remove control characters!
+        #nl = u""
+        #for ch in line:
+        #    if ord(ch) < 32: nl = nl + " "
+        #    else: nl = nl + ch
+        #line = nl
 
         # TODO: return line.encode(globals.gcurses.code) # not working with utf-8 (py 2.5, py-curses 2.2)
         return line.encode("ascii", "replace") # unknown chars replaced with ?
@@ -225,28 +194,30 @@ class CPopupListbox(object):
         y = 0
         top = self.topindex
         items = self.itemlist.items
-        self.wcontent.move(0, 0)
+        hasQuick = self.keyboardMode == CPopupListbox.QUICK and self.hoffset == 0
+        hasNumSelect = self.keyboardMode == CPopupListbox.NUMSELECT
+        win = self.wcontent
+        win.move(0, 0)
+        # win.scrollok(False) # no effect, fails with addstr on last line
         for i in xrange(top, self.itemCount):
             y = i - top
             if y > self.lastline: break
-            line = self.getLineStr(items[i].text)
-            # py2.5(2): co = cosel if i == self.curindex else conor
+            line = self.getLineStr(items[i].displayText, y)
             if i == self.curindex: co = self.coSelected
             else: co = self.coNormal
-            if y < self.lastline:
-                self.wcontent.addstr(y, 0, line, co)
-            else:
-                # w = self.textwidth - 1
-                # self.wcontent.addnstr(y, 0, line, w, co)
-                # self.wcontent.insch(y, w, line[w], co)
-                self.wcontent.insstr(y, 0, line, co) # not perfect...
-            if self.keyboardMode == CPopupListbox.QUICK and self.hoffset == 0 and items[i].quickchar != None:
-                pos = items[i].text.lower().find(items[i].quickchar)
+            if y < self.lastline: win.addstr(y, 0, line, co)
+            else: win.insstr(y, 0, line, co)
+            # win.addstr(y, 0, line, co) # combination with scrollok(False) - failed in curses
+            if hasQuick and items[i].quickchar != None:
+                # pos = items[i].quickCharPos
+                pos = line.lower().find(items[i].quickchar)
                 if pos >= 0 and pos < self.textwidth - 1:
-                    ch = items[i].text[pos]
-                    self.wcontent.insstr(y, pos, ch, self.coHilight)
+                    ch = line[pos]
+                    win.addstr(y, pos, ch, self.coHilight)
+            if hasNumSelect:
+                win.addstr(y, 0, self.numselect.format % y, self.coHilight)
 
-        if y < self.lastline: self.wcontent.clrtobot()
+        if y < self.lastline: win.clrtobot()
         self.window.redrawwin()
 
     def _drawPageInfo(self):
@@ -265,6 +236,7 @@ class CPopupListbox(object):
             s = self.itemlist.strFilter
             if len(s) > mtw: s = "/...%s" % s[-(mtw-3):]
             else: s = "/%s" % s
+            if self.keyboardMode == CPopupListbox.NUMSELECT: s = ("#%s " % self.numselect.curNumber) + s
             if self.keyboardMode == CPopupListbox.QUICK: s = "&& " + s
             if len(s) > mtw: s = s[-(mtw-3):]
             if self.keyboardMode == CPopupListbox.FILTER: co = self.coSelected
@@ -272,9 +244,11 @@ class CPopupListbox(object):
             self.window.addstr(self.height - 1, 2, s, co)
         elif self.keyboardMode == CPopupListbox.QUICK:
             self.window.addstr(self.height - 1, 2, "&&", self.coSelected)
+        elif self.keyboardMode == CPopupListbox.NUMSELECT:
+            self.window.addstr(self.height - 1, 2, "#%s" % self.numselect.curNumber, self.coSelected)
 
     def drawLastLine(self): # status
-        chline = self.window.linechars[0] # curses.ACS_HLINE
+        chline = self.window.linechars[0]
         self.window.hline(self.height - 1, 1, chline, self.width - 3)
         self._drawPageInfo()
         self._drawFilter()
@@ -282,10 +256,10 @@ class CPopupListbox(object):
 
     def drawTitle(self):
         if self.itemlist != None and self.itemlist.title != None:
-            chline = self.window.linechars[0] # curses.ACS_HLINE
+            chline = self.window.linechars[0]
             co = self.coNormal
-            w = self.textwidth
-            s = self.itemlist.title[:w]
+            w = self.textwidth - 3
+            s = self.itemlist.getTitle(w)
             self.window.addstr(0, 2, s, co)
             self.window.hline(0, 2 + len(s), chline, self.width - 3 - len(s))
             self.window.redrawln(0, 1)
@@ -309,8 +283,9 @@ class CPopupListbox(object):
 
     # horizontal offset
     def offsetDisplay(self, offset):
+        off = self.width / 2
         if offset == 0 or offset < 0 and self.hoffset == 0: return
-        self.hoffset += offset * 10
+        self.hoffset += offset * off
         if self.hoffset < 0: self.hoffset = 0
         self.drawItems()
 
@@ -327,10 +302,10 @@ class CPopupListbox(object):
         elif cmd == "end": self.setCurIndex(self.itemCount - 1)
         elif cmd == "quit":
             self.keyboardMode = CPopupListbox.EXIT
-            self.exitcommand = self.itemlist.expandVimCommand(self.itemlist.cmdCancel, self.curindex)
+            self.exitcommand = (cmd, self.curindex)
         elif cmd == "accept":
             self.keyboardMode = CPopupListbox.EXIT
-            self.exitcommand = self.itemlist.expandVimCommand(self.itemlist.cmdAccept, self.curindex)
+            self.exitcommand = (cmd, self.curindex)
         elif cmd == "quickchar":
             self.keyboardMode = CPopupListbox.QUICK
         elif cmd == "exit-quickchar":
@@ -338,6 +313,12 @@ class CPopupListbox(object):
         elif cmd == "filter":
             self.keyboardMode = CPopupListbox.FILTER
         elif cmd == "filter-accept":
+            self.keyboardMode = CPopupListbox.NORMAL
+        elif cmd == "filter-next":
+            self.offsetCurIndex(1)
+            self.keyboardMode = CPopupListbox.NORMAL
+        elif cmd == "filter-prev":
+            self.offsetCurIndex(-1)
             self.keyboardMode = CPopupListbox.NORMAL
         elif cmd == "filter-cancel":
             self.keyboardMode = CPopupListbox.NORMAL
@@ -351,12 +332,32 @@ class CPopupListbox(object):
                 self.itemlist.setFilter(self.itemlist.strFilter[:l-1])
                 self.setCurIndex(self.curindex) # fix the index and redraw items
                 self.drawLastLine()
+        elif cmd == "filter-restart":
+            self.itemlist.setFilter("")
+            self.setCurIndex(0)
+            self.drawLastLine()
+        elif cmd == "numselect":
+            self.keyboardMode = CPopupListbox.NUMSELECT
+            self.numselect.curNumber = ""
+            self.drawLastLine()
+        elif cmd == "numselect-delete":
+            self.numselect.curNumber = ""
+            self.drawLastLine()
         pass
 
-    def _vim_getkey(self): # ref: globals.gvim
-        # when Esc is pressed it is echoed to current line
-        # stdscr.addch(self.yPrompt, 0, '>')
-        # stdscr.refresh()
+    def _buildPrompt(self):
+        if self.keyboardMode == CPopupListbox.NORMAL: p2 = ""
+        elif self.keyboardMode == CPopupListbox.FILTER: p2 = ".Filter"
+        elif self.keyboardMode == CPopupListbox.QUICK: p2 = ".QuickChar"
+        elif self.keyboardMode == CPopupListbox.NUMSELECT: p2 = ".NumSelect"
+        else: p2 = ""
+        p1 = "Popup List%s >>>" % p2
+        mw = int(vim.eval("&columns")) - 2 - len(p1)
+        p3 = self.itemlist.getExtraPrompt(mw)
+        return "%s%*s " % (p1, -mw, p3)
+
+    def _vim_getkey(self):
+        ioutil.CScreen().showPrompt(self._buildPrompt())
         key = vim.eval("getchar()")
         try:
             key = int(key)
@@ -384,9 +385,10 @@ class CPopupListbox(object):
         self.show()
 
     def _prepareScreen(self):
-        # stdscr.clear()
-        # stdscr.addch(self.yPrompt, 0, '>')
-        # stdscr.refresh()
+        scr = ioutil.CScreen()
+        scr.clear()
+        scr.showPrompt("")
+        scr.refresh()
         vim.command("redraw!")
 
     def gotoQuickChar(self, ch):
@@ -416,6 +418,24 @@ class CPopupListbox(object):
 
     def resetQuickChar(self):
         self.quickChar = None
+        
+    def process_char(self, km, ch):
+        if km == self.itemlist.keymapFilter:
+            self.itemlist.setFilter(self.itemlist.strFilter + ch)
+            self.drawLastLine()
+            self.setCurIndex(0) # fix the index and redraw items
+        elif km == self.itemlist.keymapQuickChar:
+            self.gotoQuickChar(ch)
+        elif km == self.itemlist.keymapNumSelect:
+            newi = self.numselect.trySelectItem(ch, self.topindex, len(self.itemlist.items) - 1)
+            if newi >= 0:
+                self.setCurIndex(newi)
+                self.drawLastLine()
+            else:
+                self.keyboardMode = CPopupListbox.NORMAL
+            if self.numselect.isComplete():
+                self.keyboardMode = CPopupListbox.NORMAL
+        pass
 
     def process(self, curindex=0, startmode=1): # TODO: startmode=sth.NORMAL
         self.keyboardMode = startmode
@@ -426,27 +446,20 @@ class CPopupListbox(object):
         self._prepareScreen()
         self.show(curindex)
         self.refresh()
-        self.exitcommand = ""
+        self.exitcommand = None
         keyseq = ""
         while self.keyboardMode != CPopupListbox.EXIT:
             self.refresh()
             oldmode = self.keyboardMode
             ch = self._vim_getkey()
 
-            if ch == None: keyseq = ""
-            else:
+            if ch != None:
                 keyseq += ch
                 (res, cmd) = km.findKey(keyseq)
                 if res == simplekeymap.KM_PREFIX: continue # TODO: display prefix
                 elif res == simplekeymap.KM_MATCH: self.doCommand(cmd)
-                elif len(ch) == 1 and ord(ch) >= 32 and ord(ch) < 127:
-                    if km == self.itemlist.keymapFilter:
-                        self.itemlist.setFilter(self.itemlist.strFilter + ch)
-                        self.drawLastLine()
-                        self.setCurIndex(self.curindex) # fix the index and redraw items
-                    elif km == self.itemlist.keymapQuickChar:
-                        self.gotoQuickChar(ch)
-                keyseq = ""
+                elif len(ch) == 1 and ord(ch) >= 32 and ord(ch) < 127: self.process_char(km, ch)
+            keyseq = ""
 
             if oldmode != self.keyboardMode:
                 if self.keyboardMode == CPopupListbox.EXIT: break
@@ -456,29 +469,44 @@ class CPopupListbox(object):
                     km = self.itemlist.keymapFilter
                 elif self.keyboardMode == CPopupListbox.QUICK:
                     km = self.itemlist.keymapQuickChar
+                elif self.keyboardMode == CPopupListbox.NUMSELECT:
+                    km = self.itemlist.keymapNumSelect
                 if oldmode == CPopupListbox.QUICK:
                     self.resetQuickChar()
                 self.drawTitle()
                 self.drawItems()
                 self.drawLastLine()
 
-        # End of processing: execute the selected command
+        # End of processing: return the selected exit-command (if any)
 	self.hide()
-	vim.command("redraw!")
-	if len(self.exitcommand) > 0: vim.command(self.exitcommand)
+        return self.exitcommand
 
-def testpopuplb():
-    import lister
-    List = lister.CList()
-    List.loadTestItems()
-    # List.normoperation = {...}
-    # List.findoperation = {...}
-    LB = CPopupListbox((6, 5), (20, 40))
-    LB.setItemList(List)
-    LB.show()
-    LB.process()
-    LB.hide()
-    vim.command("redraw!")
-    if len(LB.exitcommand) > 0:
-        vim.command(LB.exitcommand)
+class CPopupListboxScreen(CPopupListbox):
+    def initColors(self):
+        try:
+            self.coNormal = vim.screen.getHighlightAttr("VxNormal")
+            self.coSelected = vim.screen.getHighlightAttr("VxSelected")
+            self.coHilight = vim.screen.getHighlightAttr("VxQuickChar")
+            if self.coNormal == self.coSelected: raise
+        except:
+            self.coNormal = 1
+            self.coSelected = 0
+            self.coHilight = 3
+    pass
+
+class CPopupListboxCurses(CPopupListbox):
+    def initColors(self):
+        import curses
+        if curses.has_colors():
+            curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_WHITE)
+            self.coNormal = curses.color_pair(1)
+            curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_BLUE)
+            self.coSelected = curses.color_pair(2)
+            curses.init_pair(3, curses.COLOR_RED, curses.COLOR_WHITE)
+            self.coHilight = curses.color_pair(3)
+        else:
+            self.coNormal = curses.A_NORMAL
+            self.coSelected = curses.A_UNDERLINE
+            self.coHilight = curses.A_UNDERLINE
+    pass
 

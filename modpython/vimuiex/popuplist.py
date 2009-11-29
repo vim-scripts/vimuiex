@@ -1,4 +1,5 @@
-# vim: set fileencoding=utf-8 sw=4 ts=8 et :
+#!/usr/bin/env python
+# vim:set fileencoding=utf-8 sw=4 ts=8 et:vim
 # popuplist.py - a generic listing facility with popup listboxes
 #
 # Author: Marko Mahnič
@@ -9,32 +10,27 @@
 import time
 import vim
 import simplekeymap
+import ioutil
 
+# TODO: vimuiex init script when the list is used for the first time: copy vars from vim to python
 BORDER = (2, 2) # Drawing errors in curses when w > &columns-12
 # import the correct listbox implementation
 __listbox = None
-def importLisboxImpl():
+def importListboxImpl():
     global __listbox, BORDER
     if __listbox != None: return __listbox
-    # First try the implementation with the internal screen
-    # import vimuiex._popuplist_screen as __listbox # Include when fixing bugs...
-    try:
+    if ioutil.PLATFORM == "vim.screen":
         import vimuiex._popuplist_screen as __listbox
-        if __listbox != None: return __listbox
-    except: pass
-    hasgui = int(vim.eval('has("gui_running")'))
-    if hasgui != 0:
-        # import vimuiex._popuplist_wx as __listbox # Include when fixing bugs...
-        try: import vimuiex._popuplist_wx as __listbox
-        except: print "Import error. GUI Listbox will not be available"
+        BORDER = (2, 2)
+    elif ioutil.PLATFORM == "curses":
+        import vimuiex._popuplist_screen as __listbox #TODO: Unify in _screen
+        BORDER = (12, 4) # Drawing errors in curses when w > &columns-12
+    elif ioutil.PLATFORM == "wx":
+        import vimuiex._popuplist_wx as __listbox
+        BORDER = (2, 2)
     else:
-        # import vimuiex._popuplist_term as __listbox # Include when fixing bugs...
-        try:
-            import vimuiex._popuplist_term as __listbox
-            BORDER = (12, 4) # Drawing errors in curses when w > &columns-12
-        except: print "Import error. Curses Listbox will not be available"
+        raise SystemError("VimUiEx: Invalid platform")
 
-    # TODO: failsafe: implementation with vim buffer
     return __listbox
 
 def log(msg):
@@ -42,16 +38,29 @@ def log(msg):
     f.write(msg + "\n")
     f.close()
 
-def vimScreenSize(): # ref: globals.gvim
+def vimScreenSize():
     return (int(vim.eval("&columns")), int(vim.eval("&lines")))
 
 class CListItem(object):
     def __init__(self, text=""):
         self.flags = 0
-        self.text = text
+        self._text = text
         self.quickchar = None
         self.selected = 0
 
+    @property
+    def displayText(self):
+        return self._text
+
+    @property
+    def filterText(self):
+        return self._text
+
+# TODO: add incremental search: works like filter, but lines are not hidden;
+#       TAB moves to next occurence; needed eg. with VxMan;
+# TODO: add default search mode for /: i-search or filter
+# TODO: implement multiline list items (eg. up to 3 lines)
+# TODO: pack listbox positioning in a separate class
 class CList(object):
     def __init__(self, title="", position=None, align=None, size=None, autosize=None):
         """
@@ -63,12 +72,13 @@ class CList(object):
                   H - autosize horizontally
                   C - autosize 1st column (tab delimited)
         """
-        # py2.5(2) self.title = title if title != None else ""
         if title != None: self.title = title
         else: self.title = ""
+        self.titleAlign = "<"
         self.position = position
         self.align = align
         self.size = size
+        self.minSize = (16, 4)
         self.autosize = autosize
         self._firstColumnWidth = None # property: Width of the first column
         self.maxColumnWidth = 0.3
@@ -81,10 +91,23 @@ class CList(object):
         self.keymapNorm = simplekeymap.CSimpleKeymap()
         self.keymapFilter = simplekeymap.CSimpleKeymap()
         self.keymapQuickChar = simplekeymap.CSimpleKeymap()
+        self.keymapNumSelect = simplekeymap.CSimpleKeymap()
         self.quickCharAutoSelect = "accept" # An item with a unique quick char will be auto-"accept"-ed; TODO: make it nicer
         self.cmdCancel = "" # 'echo "canceled"'
         self.cmdAccept = "" # 'echo "accepted {{i}}"'
         self.initKeymaps()
+
+    def getTitle(self, maxwidth):
+        if len(self.title) < maxwidth: return self.title
+        if maxwidth > 12:
+            maxwidth -= 3
+            dots = "..."
+        else: dots = ""
+        if self.titleAlign == ">": return dots + self.title[-maxwidth:]
+        return self.title[:maxwidth] + dots
+
+    def getExtraPrompt(self, maxwidth=40):
+        return ""
 
     def initKeymaps(self):
         def addCursorMoves(kn):
@@ -96,21 +119,28 @@ class CList(object):
             kn.setKey(r"\<pageup>", "prevpage")
             kn.setKey(r"\<home>", "home")
             kn.setKey(r"\<end>", "end")
+            # TODO: Experimental
+            kn.setKey(r"\<TAB>", "next")
+            kn.setKey(r"\<S-TAB>", "prev")
         kn = self.keymapNorm
+        addCursorMoves(kn)
         kn.setKey(r"j", "next")
         kn.setKey(r"k", "prev")
         kn.setKey(r"h", "lshift")
         kn.setKey(r"l", "rshift")
-        kn.setKey(r"n", "nextpage")
-        kn.setKey(r"p", "prevpage")
-        kn.setKey(r"0", "home")
+        kn.setKey(r" ", "nextpage")
+        kn.setKey(r"b", "prevpage")
+        kn.setKey(r"n", "nextpage") # MAYBE: remove mapping
+        kn.setKey(r"p", "prevpage") # MAYBE: remove mapping
+        kn.setKey(r"0", "home") # MAYBE: set offset to 0
         kn.setKey(r"gg", "home")
-        kn.setKey(r"$", "end")
+        kn.setKey(r"$", "end") # MAYBE: set offset to view the end of the longest line
         kn.setKey(r"G", "end")
-        addCursorMoves(kn)
         kn.setKey(r"f", "filter")
         kn.setKey(r"/", "filter")
         kn.setKey(r"&", "quickchar")
+        kn.setKey(r"i", "numselect")
+        kn.setKey(r"#", "numselect")
         kn.setKey(r"q", "quit")
         kn.setKey(r"\<Esc>", "quit")
         kn.setKey(r"\<CR>", "accept")
@@ -122,14 +152,25 @@ class CList(object):
         kn.setKey(r"wv", "winpos:align-vceneter")
         kn.setKey(r"wC", "winpos:align-ceneter")
         kn = self.keymapFilter
+        addCursorMoves(kn)
         kn.setKey(r"\<CR>", "filter-accept")
         kn.setKey(r"\<ESC>", "filter-cancel")
         kn.setKey(r"\<BS>", "filter-delete")
+        kn.setKey(r"\<TAB>", "filter-next")
+        kn.setKey(r"\<S-TAB>", "filter-prev")
         kn = self.keymapQuickChar
         addCursorMoves(kn)
         kn.setKey(r"\<CR>", "accept")
         kn.setKey(r"\<ESC>", "quit")
         kn.setKey(r"&", "exit-quickchar")
+        kn.setKey(r"/", "filter")
+        kn.setKey(r"#", "numselect")
+        kn = self.keymapNumSelect
+        kn.setKey(r"\<CR>", "accept")
+        kn.setKey(r"\<ESC>", "quit")
+        kn.setKey(r"\<BS>", "numselect-delete")
+        kn.setKey(r"q", "quit")
+        kn.setKey(r"&", "quickchar")
         kn.setKey(r"/", "filter")
 
     # TODO: 3. python: eval a python command
@@ -140,7 +181,6 @@ class CList(object):
             cmd = ""
         elif cmd.startswith("vim:"): return "" # TODO
         return cmd
-    
 
     def doWinposCmd(self, cmd):
         def _realign(remove, add):
@@ -161,6 +201,9 @@ class CList(object):
 
     def doListCommand(self, cmd, curindex):
         return cmd
+
+    def redraw(self):
+        if self.__listbox != None: self.__listbox.redraw()
 
     def refreshDisplay(self):
         self.__items = None
@@ -195,7 +238,7 @@ class CList(object):
             startat = 0
             inhead=[]; intail=[]
             for i in self.allitems:
-                pos = i.text.lower().find(filt, startat)
+                pos = i.filterText.lower().find(filt, startat)
                 if pos < 0: continue
                 elif pos == startat and self.filtersort: inhead.append(i)
                 else: intail.append(i)
@@ -225,7 +268,6 @@ class CList(object):
         self.refreshDisplay()
 
     def getTrueIndex(self, filteredIndex):
-        # py2.5(2): nitems = len(self.__items) if self.__items != None else 0
         if self.__items != None: nitems = len(self.__items)
         else: nitems = 0
         if filteredIndex < 0 or filteredIndex >= nitems: i = -1
@@ -245,8 +287,10 @@ class CList(object):
 
     def _limitSize(self, sx, sy):
         w, h = self._maxSize()
-        if sx < 16: sx = 16
-        if sy < 4: sy = 4
+        if self.minSize[0] > w: self.minSize[0] = w
+        if self.minSize[1] > h: self.minSize[1] = h
+        if sx < self.minSize[0]: sx = self.minSize[0]
+        if sy < self.minSize[1]: sy = self.minSize[1]
         if sx > w: sx = w
         if sy > h: sy = h
         return (sx, sy)
@@ -270,8 +314,8 @@ class CList(object):
         wmax = int(textwidth * mwf)
         wopt = 0
         for i in items:
-            if i.text.find("\t") < 0: continue
-            cols = i.text.split("\t", 1)
+            if i.displayText.find("\t") < 0: continue
+            cols = i.displayText.split("\t", 1)
             w = len(cols[0].rstrip())
             if w > wopt: wopt = w
             if wopt > wmax: wopt = wmax; break
@@ -293,7 +337,7 @@ class CList(object):
             if autosize.find("v") >= 0: sy = len(self.allitems) + 2
             if autosize.find("h") >= 0:
                 if len(self.allitems) < 1: sx = 0
-                else: sx = max([len(li.text) for li in self.allitems]) + 2
+                else: sx = max([len(li.displayText) for li in self.allitems]) + 2
             self.size = self._limitSize(sx, sy)
 
         if position and self.align != None:
@@ -321,12 +365,23 @@ class CList(object):
         self.relayout()
 
     def process(self, curindex = 0, startmode = 1): # TODO: startmode=sth.NORMAL
-        lbimpl = importLisboxImpl()
+        lbimpl = importListboxImpl()
         if lbimpl == None: return
         self._calcInitialPosition()
-	self.__listbox = lbimpl.CPopupListbox(position=self.position, size=self.size)
+	self.__listbox = lbimpl.createListboxView(position=self.position, size=self.size)
 	self.__listbox.setItemList(self)
-	self.__listbox.process(curindex, startmode)
+	exitcmd = self.__listbox.process(curindex, startmode)
         # WX: will exit immediately; non-modal window
-        # Curses: will exit after processing; modal window
-        pass
+        # Curses: will exit after processing and return the exit command (modal window)
+        if exitcmd != None:
+            cmd = None
+            if exitcmd[0] == "accept": cmd = self.cmdAccept
+            elif exitcmd[0] == "quit": cmd = self.cmdCancel
+            if cmd != None:
+                import inspect
+                idx = exitcmd[1]
+                if inspect.isfunction(cmd): cmd(self.getTrueIndex(idx))
+                elif type(cmd) == type("") and cmd != "":
+                    cmd = self.expandVimCommand(cmd, idx)
+                    vim.command(cmd)
+

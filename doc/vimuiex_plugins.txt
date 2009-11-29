@@ -1,0 +1,207 @@
+*vimuiex_plugins.txt*	 Vimuiex Plugins           Last Change: November 2009
+			*vimuiex-plugins*
+
+Commands that require "+python" and curses or the "+python_screen" patch:
+
+   VxBufListSelect		    |vimuiex-vxbuflistselect|
+   VxOpenRecentFile		    |vimuiex-vxopenrecentfile|
+   VxTextMenu			    |vimuiex-vxtextmenu|
+   VxFileBrowser		    |vimuiex-vxfilebrowser|
+   VxOccur			    |vimuiex-vxoccur|
+   VxOccurCurrent		    |vimuiex-vxoccurcurrent|
+   VxOccurTags			    |vimuiex-vxoccurtags|
+   VxOccurRoutines		    |vimuiex-vxoccurroutines|
+   VxSourceTasks		    |vimuiex-vxsourcetasks|
+   VxDisplax			    |vimuiex-vxdisplay|
+   VxMarks			    |vimuiex-vxmarks|
+   VxCmd			    |vimuiex-vxcmd|
+   VxMan			    |vimuiex-vxman|
+
+Commands that require "+python_screen":
+
+   VxLineJump			    |vimuiex-vxlinejump|
+   VxWindowJump			    |vimuiex-vxwindowjump|
+
+==============================================================================
+POPUP MENU NAVIGATOR				          *vimuiex-vxtextmenu*
+
+VxTextMenu                                       *vimuiex-vxtextmenu*
+Displays a list of top-level menus in a popup listbox. An item from the menu 
+can be selected as described in |vimuiex-operation|. When <CR> is pressed on a 
+selected item it is activated. If the item is a submenu it will be displayed, 
+otherwise a command bound to the menu will be executed. When <BS> is pressed on 
+any item, the curent menu is closed an its parent menu is activated.
+
+To start use: >
+  :VxTextMenu
+<
+TODO: add mouse support
+
+Note: The menu initially starts with menu shortcuts enabled. To disable them 
+and enter normal listbox navigation mode, press '&'.
+
+==============================================================================
+POPUP BUFFER EXPLORER					   *vimuiex-vxbuflist*
+
+VxBufListSelect                                  *vimuiex-vxbuflistselect*
+Displays a list of buffers in an overlapping window. A buffer can be selected 
+from the list as described in |vimuiex-operation|. When <CR> is perssed on a 
+selected buffer the list is closed an the selected buffer is activated.
+
+To start use: >
+  :VxBufListSelect
+<
+==============================================================================
+OPEN RECENT FILE                                       *vimuiex-vxrecentfile*
+
+VxOpenRecentFile                                 *vimuiex-vxopenrecentfile*
+Displays a list of recent files in an overlapping window. The filename is
+displayed in the first column and the directory in the second column. A file
+can be selected from the list as described in |vimuiex-operation|. When <CR>
+is perssed on a selected file the list is closed, the file is loaded (if not
+already loaded) and activated.
+
+To start use: >
+  :VxOpenRecentFile
+<
+Settings for the plugin:
+
+   Number of recent files in history: >
+   let g:VxRecentFile_size = 50
+<
+
+   Exclude the files from history if they match a regular expression: >
+   let g:VxRecentFile_exclude = ""
+<
+
+   The filenames are case sensitive: >
+   let g:VxRecentFile_nocase = 1
+<
+
+==============================================================================
+BROWSE THE FILESYSTEM TO OPEN A FILE                    *vimuiex-vxdired*
+
+VxFileBrowser                                    *vimuiex-vxfilebrowser*
+Displays the contents of the current working directory. The subdirectories are 
+marked with a preceeding '+'. The files are sorted by name. A file or directory 
+can be selected from the list as described in |vimuiex-operation|. When <CR> is 
+pressed on a selected file, that file is loaded (if not already loaded) and 
+activated. If <CR> is pressed on a subdirectory, its contents is displayed in 
+the list. When <BS> is pressed on any item, the curent directory is closed an 
+its parent directory is displayed.
+
+Pressing 'd' on any item will close the file list and display a list of 
+directories from which files were recently loaded. If <CR> is pressed on a 
+selected directory, the list of directories will close and the content of the 
+selected directory will be displayed in the file list.
+
+The size of the recent directory list can be changed with: >
+   let g:VxRecentDir_size = 20
+<
+
+==============================================================================
+ENHANCE INTERNAL COMMANDS                              *vimuiex-vxcapture*
+
+
+VxCmd                                            *vimuiex-vxcmd*
+Capture the output of a Vim command and display it in a popup list. Examples:
+
+   Show the list of Vim buffers (see also |vimuiex-vxbuflist|): >
+   :VxCmd ls
+<
+   Show the contents of the current directory (see also |vimuiex-vxdired|): >
+   :VxCmd !ls -la
+<
+Note: VxCmd will fail if the Vim command calls |redir| during execution.
+
+
+
+VxMan                                            *vimuiex-vxman*
+Capture the output of a man command and display it in a popuplist. This 
+command is a shorthand for: >
+   :VxCmd !man -P cat <man-query> | col -b
+<
+and requires the col program from the bsdmainutils debian package.
+
+To replace the default command K use:
+   nmap <silent> K :VxMan <cword> <CR>
+
+
+VxDisplay					 *vimuiex-vxdisplay*
+Display the contents of the registers (output of the :display command) in a 
+popup listbox. If <CR> is pressed on a selected item, the contents of the 
+register is pasted into current buffer.
+
+
+VxMarks						 *vimuiex-vxmarks*
+Display the marks (output of the :marks command) in a popup listbox. If <CR> 
+is pressed on a valid mark, the cursor jumps to that mark.
+
+
+
+==============================================================================
+SHOW OCCURRENCES OF REGULAR EXPRESSIONS                *vimuiex-vxoccur-lib*
+
+A set of commands that search for regular expressions in files. The lines
+where matches are found are displayed in a popup listbox. A line can be 
+selected from the list as described in |vimuiex-operation|. If <CR> is pressed
+on a selected line, the listbox is closed and the selected line is displayed.
+
+
+VxOccur                                          *vimuiex-vxoccur*
+Prompts for a regular expression and finds all occurences of the expression in
+the current buffer. The lines with the matches are displayed in the popup
+listbox. 
+
+
+VxOccurCurrent                                   *vimuiex-vxoccurcurrent*
+Captures the output of the command '[I' and displays it in the popup listbox.
+
+Suggested keyboard mapping:
+>
+   nnoremap <silent> [I :VxOccurCurrent<cr>
+<
+   
+VxOccurTags                                      *vimuiex-vxoccurtags*
+Passes the current file to ctags and displays the results in the popup
+listbox.
+
+
+VxOccurRoutines                                  *vimuiex-vxoccurroutines*
+Finds definitions of "routines" in the current buffer. Routines are defiend
+with regular expressions (one regexp for each filetype) which are stored in
+a global routine definition dictionary.
+Example:
+>
+   " A simple routine regexp for vim mode
+   let g:vxoccur_routine_def["vim"] = '\(^\s*\(s:\)\?\(func|function\)!\?\W\)'
+<
+
+VxSourceTasks                                    *vimuiex-vxsourcetasks*
+Finds tasks in source and displays them in a popup listbox. The tasks are 
+marked with special words which can be defined in a global variable:
+>
+   let g:vxoccur_task_words=['TODO', 'FIXME', 'BUG']
+<
+The default task words are: ['COMBAK', 'TODO', 'FIXME', 'XXX']
+
+
+==============================================================================
+JUMP TO SCREEN LOCATION WITH KEYBOARD			   *vimuiex-vxjump*
+
+NOTE: These plugins require "+python_screen" feature
+
+VxLineJump                                       *vimuiex-vxlinejump*
+Displays lables in the line-number area and waits for the user to enter a
+label. When the label is entered, the cursor moves to the line with the
+corresponding label.
+
+
+VxWindowJump                                     *vimuiex-vxwindowjump*
+Displays a label in the center of every window and waits for the user to enter
+a label. When the label is entered, the cursor moves to the window with the
+corresponding label.
+
+
+
+## vim:tw=78:noet:wrap:ts=8:ft=help:norl:

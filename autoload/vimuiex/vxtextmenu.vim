@@ -8,10 +8,18 @@
 "
 " (requires python; works only in terminal; using curses)
 
-if exists("g:vxtextmenu_loaded") && g:vxtextmenu_loaded
+if vxlib#plugin#StopLoading("#au#vimuiex#vxtextmenu")
    finish
 endif
-let g:vxtextmenu_loaded = 1
+
+" =========================================================================== 
+" Local Initialization - on autoload
+" =========================================================================== 
+call vxlib#python#prepare()
+map <SID>xx <SID>xx
+let s:SID = substitute(maparg('<SID>xx'), '<SNR>\(\d\+_\)xx$', '\1', '')
+unmap <SID>xx
+" =========================================================================== 
 
 function! s:getMenu()
    " TODO: select the correct menu depending on current mode
@@ -32,16 +40,11 @@ function! s:getMenu()
    return themenu
 endfunc
 
-map <SID>xx <SID>xx
-let s:SID = substitute(maparg('<SID>xx'), '<SNR>\(\d\+_\)xx$', '\1', '')
-unmap <SID>xx
-
 " TODO: Remove some top-level entries from the menu (Toolbar, Popup)
 " TODO: Implement a pop-up context menu for textmode
-function! VxTextMenu()
-   call modpython#prepare()
-
+function! vimuiex#vxtextmenu#VxTextMenu()
 exec 'python VIM_SNR_VXTEXTMENU="<SNR>' . s:SID .'"'
+
 python << EOF
 import vim
 import vimuiex.textmenu as menu
@@ -54,3 +57,11 @@ EOF
 
 endfunc
 
+" =========================================================================== 
+" Global Initialization - Processed by Plugin Code Generator
+" =========================================================================== 
+finish
+
+" <VIMPLUGIN id="vimuiex#vxtextmenu" require="python&&(!gui_running||python_screen)">
+   command VxTextMenu call vimuiex#vxtextmenu#VxTextMenu()
+" </VIMPLUGIN>

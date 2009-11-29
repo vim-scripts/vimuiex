@@ -1,5 +1,5 @@
 " vim: fileencoding=utf-8
-" modpython.vim - Prepare vim/python to use loadable modules
+" python.vim - Prepare vim/python to use loadable modules
 "
 " Author: Marko Mahnič
 " Created: April 2009
@@ -8,22 +8,20 @@
 "
 " Intended use:
 " function ExampleUsesPythonModule()
-"    call modpython#prepare()
+"    call vxlib#python#prepare()
 "    python << EOF
 "    import my_vim_module   # my_vim_module.py installed in ~/.vim/modpython
 "    ...
 "    EOF
 " endfunc
 
-if exists("g:modpythonscript_loaded") && g:modpythonscript_loaded
-   finish
+if vxlib#plugin#StopLoading("#au#vxlib#python")
+  finish
 endif
-let g:modpythonscript_loaded = 1
 
 " Add ~/.vim/modpython to python search path.
 " Vim-python modules should be installed in ~/.vim/modpython
-" TODO: maybe add system-wide modules
-function! modpython#prepare()
+function! vxlib#python#prepare()
    if has('python') && !exists("s:pypath")
       let s:pypath = globpath(&runtimepath, "modpython")
       python import sys

@@ -12,8 +12,9 @@ import wx
 import time
 import re
 import vim
-import globals.gwx
+import ioutil.gwx
 import simplekeymap
+import platform
 
 def log(msg):
     f = open ("testlog.txt", "a")
@@ -79,7 +80,7 @@ class MyFrame(wx.Frame):
     def syncListbox(self):
         LB = self.listbox
         while LB.GetCount() > 0: LB.Delete(0)
-        for i in self.itemlist.items: LB.Append(i.text)
+        for i in self.itemlist.items: LB.Append(i.displayText)
 
     def setCurIndex(self, index):
         if index < 0: index = -1
@@ -274,7 +275,7 @@ class CPopupListbox:
         self.__frame.SetDimensions(pos[0], pos[1], size[0], size[1], wx.SIZE_FORCE)
 
     def process(self, curindex=0, startmode=1):
-        app = globals.gwx.vimPrepareWx()
+        app = ioutil.gwx.vimPrepareWx()
         cw, ch = vimCharSize()
         x, y = vimWindowPos()
         pos = (x + self.left * cw, y + self.top * ch)
@@ -283,5 +284,10 @@ class CPopupListbox:
         self.__frame.setItemList(self.itemlist, curindex)
         self.__frame.Show()
         app.MainLoop()
-        pass
+        return None
 
+# Factory
+def createListboxView(position, size):
+    if platform.PLATFORM == "wx":
+        return CPopupListbox(position, size)
+    return None

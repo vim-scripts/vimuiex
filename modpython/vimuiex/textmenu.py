@@ -35,17 +35,19 @@ class CMenuItem:
 
     def getDisplayText(self, submenuIcon="[+] "):
         if self.separator: return "-" * 30
-        # py2.5(2): sub = "[+] " if self.submenu else "    "
         if self.submenu: sub = submenuIcon
         else: sub = " " * (len(submenuIcon))
-        # py2.5(2): cmd = "   [%s]" % self.command if self.command != None else ""
         if self.command != None: cmd = "   [%s]" % self.command
         else: cmd = ""
         txt = sub + self.title.strip().replace("&", "")
         if cmd != "": return txt + "\t" + cmd
-        #if firstColumnWidth == None or firstColumnWidth < 22: firstColumnWidth = 22
-        #txt = "%*s\t" % (-firstColumnWidth, txt)
         return txt + "\t"
+
+    def getTitleText(self):
+        txt = self.title.strip().replace("&", "")
+        txt = txt.replace("\t", " ")
+        txt = u"%s" % txt
+        return txt.encode("ascii", "replace")
 
     def getQuickChar(self):
         pos = self.title.find("&")
@@ -64,6 +66,7 @@ class CTextMenu(popuplist.CList):
     def __init__(self, *args, **kwds):
         if not kwds.has_key("title"): kwds["title"] = "Menu"
         popuplist.CList.__init__(self, *args, **kwds)
+        self.topTitle = self.title
         self.menuitems = []
         self.menupath = [] # stack of positions in menuitems
         self.curitems = [] # list of positions of currently displayed items
@@ -72,25 +75,69 @@ class CTextMenu(popuplist.CList):
         self.autosize += "C"
         self.maxColumnWidth = 0.7
 
+    # Assign missing quickchars; TODO: move to CList?
+    def assignQuickChars(self, items):
+        chars = {None: 0}
+        def addChar(ch):
+            if not chars.has_key(ch): chars[ch] = 0
+            chars[ch] += 1
+        def isValidChar(ch):
+            return (ch >= 'a' and ch <= 'z') or (ch >= '0' and ch <= '9')
+        def wordStarts(text):
+            pc = " "; ws = []
+            for ch in text:
+                ch = ch.lower()
+                if (pc == " " or pc == "\t") and isValidChar(ch): ws.append(ch)
+                pc = ch
+            return ws
+        for it in items: addChar(it.quickchar)
+        if chars[None] < 1: return
+        for it in (i for i in items if i.quickchar == None):
+            for ch in wordStarts(it._text):
+                if not chars.has_key(ch):
+                    it.quickchar = ch
+                    addChar(ch)
+                    chars[None] -= 1
+                    break
+        for it in (i for i in items if i.quickchar == None):
+            for ch in it._text:
+                ch = ch.lower()
+                if not isValidChar(ch): continue
+                if not chars.has_key(ch):
+                    it.quickchar = ch
+                    addChar(ch)
+                    chars[None] -= 1
+                    break
+        if chars[None] < 1: return
+        # TODO: assign a quickchar char with least occurences
+
+    def updateMenuTitle(self):
+        level = len(self.menupath)
+        if level == 0: self.title = self.topTitle
+        else:
+            item = self.menuitems[self.menupath[level-1]]
+            self.title = item.getTitleText()
+
     def selectLevel(self):
         level = len(self.menupath)
         if level == 0: pos = 0
         else: pos = self.menupath[level-1] + 1
         mmax = len(self.menuitems)
         self.curitems = []
-        # TODO: get all items with level until the next item with level-1 or EOF
+        # get all items with level until the next item with level-1 or EOF
         while pos < mmax:
             m = self.menuitems[pos]
             if m.level == level: self.curitems.append(pos)
             elif m.level < level: break
             pos += 1
-        # items = [self.menuitems[i].getDisplayText() for i in self.curitems]
-        # self.loadUnicodeItems(items)
         self.allitems = []
         for i in self.curitems:
-            item = popuplist.CListItem(self.menuitems[i].getDisplayText(self.submenuIcon))
-            item.quickchar = self.menuitems[i].getQuickChar()
-            self.allitems.append(item)
+            menuitem = self.menuitems[i]
+            listitem = popuplist.CListItem(menuitem.getDisplayText(self.submenuIcon))
+            listitem.quickchar = menuitem.getQuickChar()
+            self.allitems.append(listitem)
+        self.assignQuickChars(self.allitems)
+        self.updateMenuTitle()
         self.refreshDisplay()
 
     def loadMenuItems(self, vimvar):

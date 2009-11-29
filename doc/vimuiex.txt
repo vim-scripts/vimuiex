@@ -1,71 +1,58 @@
-*vimuiex.txt*        User Interface Extensions         Last Change: April 2009
+*vimuiex.txt*        User Interface Extensions      Last Change: November 2009
 
 User Interface Extensions (Experiment)
-			  Version 0.1
+		       Version 0.5
 
-|vimuiex-installation| Installation
-|vimuiex-vxbuflist|    Popup buffer explorer
-|vimuiex-vxtextmenu|   Popup menu navigator
-|vimuiex-pythonlib|    Python library usage
-|vimuiex-testing|      TESTING
+  Description                     |vimuiex|	      
+  Default popup list operation    |vimuiex-operation|   
+  Plugins                         |vimuiex-plugins|     
+  Python library usage            |vimuiex-pythonlib|   
+  Installation                    |vimuiex-installation|
+  TESTING                         |vimuiex-testing|     
 
 For Vim version 7.2 and above.
-Requires python interface.
+Requires python interface. A patch is required for GVim.
 
 ==============================================================================
-INSTALLATION						*vimuiex-installation*
+DESCRIPTION					*vimuiex*
 
-To install:
-  - Download the vimuiex.zip.
-  - Extract the zip archive into your runtime directory.
-  - Start Vim or goto an existing instance of Vim.
-  - Execute the following command:
->
-      :helptag <your runtime directory>/doc
-<
-    This will generate all the help tags for any file located in the doc
-    directory.
+Vimuiex is a library and a set of plugins for the Vim text editor. It adds a 
+popup listbox that is displayed in an overlapping window. The list can be 
+navigated with the usual Vim keys. When an item is selected from the list an 
+arbitrary action can be taken.
 
-Install script http://www.vim.org/scripts/script.php?script_id=1863
-
-Linux: to use in gvim, python wxwidgets package must be installed. The name of 
-the debian package is python-wxgtk2.8. 
-
-Windows: install Python (http://www.python.org) and wxPython 
-(http://www.wxpython.org). GVim 7.2 requires Python 2.4.
+The core of the library is written in Python so it will only work if "+python" 
+feature is present in Vim at runtime.
 
 ==============================================================================
-POPUP BUFFER EXPLORER					   *vimuiex-vxbuflist*
+DEFAULT POPUP LIST OPERATION			*vimuiex-operation*
 
-Displays a list of buffers in an overlapping window. In terminal the window is 
-displayed using the curses library and is modal. In vim-gui the window is 
-created using the wxWidgets library and is non-modal.
+A popup list has 4 basic modes of operation:
+   normal navigation		|vimuiex-navigation|
+   item filtering		|vimuiex-filtering|
+   quick-char selection		|vimuiex-quickchar|
+   numeric selection		|vimuiex-numeric|
 
-Some keys may not work in terminal mode (eg. <home>, <end>).
-
-To start use: >
-  :call VxBufListSelect()
-<
-To bind to a key use: >
-  noremap <silent> <F3> :call VxBufListSelect()<cr>
-<
 				       *vimuiex-navigation*
-You can navigate the items in the list with the following keys:
-   j, <down>	     next
-   k, <up>	     previous
-   h, <left>	     shift left
-   l, <right>	     shift right
-   n, <pgdown>	     page down
-   p, <pgup>	     page up
-   0, gg, <home>     top of list
-   $, G, <end>	     bottom of list
-   f, /		     enter filtering mode
-   q, <Esc>	     close the list without selection
-   <CR>		     select the current item and execute a command
-   wh, wj, wk, wl    move window to border
-   wc, wv, wC        center window
+The following commands are available when in normal operation:
 
-				       *vimuiex-filtering-mode*
+   j, <down>, <tab>	     next
+   k, <up>, <s-tab>	     previous
+   h, <left>		     shift left
+   l, <right>		     shift right
+   n, <space>, <pgdown>	     page down
+   b, <pgup>		     page up
+   0, gg, <home>	     top of list
+   $, G, <end>		     bottom of list
+   f, /			     enter filtering mode |vimuiex-filtering|
+   i, #			     enter numeric mode |vimuiex-numeric|
+   &			     enter quickchar mode |vimuiex-quickchar|
+   q, <Esc>		     close the list without selection
+   <CR>			     select the current item and execute a command
+   wh, wj, wk, wl	     move window to border
+   wc, wv, wC		     center window
+
+				       *vimuiex-filtering*
 In filtering mode new ASCII characters are added to the filter and only the 
 items that match the filter are displayed. First the items that start with the 
 filter string are displayed followed by the items that contain the filter 
@@ -77,46 +64,21 @@ string elsewhere. In filtering mode the following keys can be used:
 
 (TODO: new keys can be added to the popup list keymap)
 
-==============================================================================
-POPUP MENU NAVIGATOR				          *vimuiex-vxtextmenu*
+				       *vimuiex-numeric*
+When the listbox enters numeric-selection mode, numbers are displayed in front 
+of every item. When numbers are entered the currently selected item changes 
+according to the entered numbers. The keys "mjkluio" are "mapped" to numbers 
+"0123456" which is the position of the numeric keyboard on a notebook with an 
+english keyboard layuot.
 
-Displays a list of top-level menus in a popup listbox. 
+				       *vimuiex-quickchar*
+This mode is functional only when a quick-char (shortcut letter) is assiged to 
+every item in the list.
 
-To start use: >
-  :call VxTextMenu()
-<
-To bind to a key use: >
-  noremap <silent> <F10> :call VxTextMenu()<cr>
-<
-Note: (GVim) if the gui menu is visible, F10 will activate that menu so the 
-text menu has to be bound to another key.
-
-The menu can be navigated with the following keys:
-   j, <down>	     next
-   k, <up>	     previous
-   h, <left>	     shift left
-   l, <right>	     shift right
-   n, <pgdown>	     page down
-   p, <pgup>	     page up
-   0, gg, <home>     top of list
-   $, G, <end>	     bottom of list
-   f, /		     enter filtering mode (see |vimuiex-filtering-mode|)
-   &                 enter/exit menu shortcut navigation mode (not in wx)
-   q, <Esc>	     close the list without selection
-   <CR>		     select the current menu item and execute the assigned 
-		     command or display a submenu
-   <BS>		     Display parent menu
-   wh, wj, wk, wl    move window to border
-   wc, wv, wC        center window
-
-Mouse commands:
-   <LeftMouse>	     Select menu
-   <RightMouse>      Display parent menu
-
-Note: Mouse commands only work when the mouse pointer is on a menu item.
-
-Note: The menu initially starts with menu shortcuts enabled. To disable them 
-and enter normal listbox navigation mode, press '&'.
+Items are selected with letters from the keyboard. Each item has a quick-char 
+that leads to it marked. If an item has a unique quick-char the item will be 
+selected when the appropriate key is pressed. Otherwise pressing the key will 
+cycle between the items and <CR> must be pressed to select the item.
 
 ==============================================================================
 PYTHON LIBRARY USAGE				          *vimuiex-pythonlib*
@@ -126,7 +88,7 @@ Example: Display a list of buffers		       *vimuiex-list-example*
 
 1. Prepare python so that it will load modules from ~/.vim/modpython: 
 >
-  call modpython#prepare()
+  call vxlib#python#prepare()
 <
 It is best to add this call to every function that is exported from the script 
 and uses python modules installed in modpython. This way python won't be used 
@@ -173,7 +135,7 @@ when it is not needed.
   List.process(curindex=1)
 <
   Remove the refeence to the List variable. This may free some memory used by 
-  python. The List variable is defined globally and remain in memory between 
+  python. The List variable is defined globally and remains in memory between 
   calls to python. In wx implementation the memory will be freed only after 
   the window with the list is closed.
 >
@@ -222,9 +184,31 @@ will place the menu at the top-left corner of the vim screen and autosize the
 menu in the vertical and horizontal direction.
 
 ==============================================================================
+INSTALLATION						*vimuiex-installation*
+
+To install:
+  - Download the vimuiex.zip.
+  - Extract the zip archive into your runtime directory.
+  - Start Vim or goto an existing instance of Vim.
+  - Execute the following command:
+>
+      :helptag <your runtime directory>/doc
+<
+    This will generate all the help tags for any file located in the doc
+    directory.
+
+To use the library in GVim a patch must be applied to Vim source.
+
+Windows: install Python (http://www.python.org). GVim 7.2 requires Python 2.4.
+
+Note: In versions 0.1 - 0.4 a wxpython implementation was also available. The
+implementation was not updated and tested in version 0.5.
+==============================================================================
 TESTING							     *vimuiex-testing*
 
-The library is experimental. It was tested on this configurations:
+The library is experimental.
+
+Version 0.4 was tested on these configurations:
 
 Linux
    * kubuntu 8.10
@@ -244,5 +228,6 @@ Windows
    * python 2.4
    * wxpython (2.8.9.2)
 
-vim:tw=78:noet:wrap:ts=8:ft=help:norl:
 
+
+## vim:tw=78:noet:wrap:ts=8:ft=help:norl:
