@@ -8,7 +8,7 @@
 "
 " (requires python; works only in terminal; using curses)
 
-if vxlib#plugin#StopLoading("#au#vimuiex#vxjump")
+if vxlib#plugin#StopLoading('#au#vimuiex#vxjump')
    finish
 endif
 
@@ -52,7 +52,7 @@ endfunc
 " =========================================================================== 
 finish
 
-" <VIMPLUGIN id="vimuiex#vxjump" require="python&&(!gui_running||python_screen)">
+" <VIMPLUGIN id="vimuiex#vxjump" require="python&&python_screen">
    command VxLineJump call vimuiex#vxjump#VxLineJump()
    command VxWindowJump call vimuiex#vxjump#VxWindowJump()
 " </VIMPLUGIN>

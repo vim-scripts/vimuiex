@@ -22,6 +22,10 @@ Commands that require "+python_screen":
    VxLineJump			    |vimuiex-vxlinejump|
    VxWindowJump			    |vimuiex-vxwindowjump|
 
+Commands defined in VxLib:
+
+   Preview for QuickFix window      |vxlib-quickfixpreview|
+
 ==============================================================================
 POPUP MENU NAVIGATOR				          *vimuiex-vxtextmenu*
 
@@ -46,7 +50,20 @@ POPUP BUFFER EXPLORER					   *vimuiex-vxbuflist*
 VxBufListSelect                                  *vimuiex-vxbuflistselect*
 Displays a list of buffers in an overlapping window. A buffer can be selected 
 from the list as described in |vimuiex-operation|. When <CR> is perssed on a 
-selected buffer the list is closed an the selected buffer is activated.
+selected buffer the list is closed an the selected buffer is activated. Other
+mappings:
+
+  gs	     Open selected buffer with split
+  gv	     Open selected buffer with vsplit
+  gt, <c-cr> Open selected buffer in a new tab (if not already visible)
+  xd         Delete selected buffer
+  xw         Wipeout selected buffer
+  os         Change the sort order of buffers
+  ou         Toggle display of unlisted buffers
+
+The commands 'gs' and 'gv' can operate on marked buffers. When multiple
+buffers are marked in the list (with the 'm' command) they will be opened
+horizontally/vertically split.
 
 To start use: >
   :VxBufListSelect
@@ -59,7 +76,12 @@ Displays a list of recent files in an overlapping window. The filename is
 displayed in the first column and the directory in the second column. A file
 can be selected from the list as described in |vimuiex-operation|. When <CR>
 is perssed on a selected file the list is closed, the file is loaded (if not
-already loaded) and activated.
+already loaded) and activated. A file can also be opened with the following
+commands:
+
+  gs	     Open selected file with split
+  gv	     Open selected file with vsplit
+  gt, <c-cr> Open selected file in a new tab
 
 To start use: >
   :VxOpenRecentFile
@@ -82,18 +104,37 @@ Settings for the plugin:
 BROWSE THE FILESYSTEM TO OPEN A FILE                    *vimuiex-vxdired*
 
 VxFileBrowser                                    *vimuiex-vxfilebrowser*
-Displays the contents of the current working directory. The subdirectories are 
-marked with a preceeding '+'. The files are sorted by name. A file or directory 
-can be selected from the list as described in |vimuiex-operation|. When <CR> is 
-pressed on a selected file, that file is loaded (if not already loaded) and 
-activated. If <CR> is pressed on a subdirectory, its contents is displayed in 
-the list. When <BS> is pressed on any item, the curent directory is closed an 
+
+Displays the contents of a directory implied by the |browsedir| option. The
+subdirectories are marked with a preceeding '+'. The files are sorted by name.
+A file or a directory can be selected from the list as described in
+|vimuiex-operation|.  When <CR> is pressed on a selected file, that file is
+loaded (if not already loaded) and activated. The selected file can also be
+opened with the following commands:
+
+  gs	     Open selected file with split
+  gv	     Open selected file with vsplit
+  gt, <c-cr> Open selected file in a new tab
+
+If <CR> is pressed on a subdirectory, its contents is displayed in the
+list. When <BS> is pressed on any item, the curent directory is closed an 
 its parent directory is displayed.
 
 Pressing 'd' on any item will close the file list and display a list of 
 directories from which files were recently loaded. If <CR> is pressed on a 
 selected directory, the list of directories will close and the content of the 
 selected directory will be displayed in the file list.
+
+Files from subdirectories of the current directory can be displayed in a
+single list. To increase the number of subdirectory levels to be displayed
+press <C-L>. To decrease press <C-H> and to cancel subdirectory display press
+<C-K>. The number of files displayed in the list is limited to approx. 1000
+items. When the limit is reached, no new subdirectories are added to the list.
+When the filter is active, only the matching files are counted so more
+subdirectories are processed. The filesystem is re-read after every filter
+change and may take a lot of time, depending on the number of files processed.
+
+The keysequence 'oa' will toggle the visibility of file attributes.
 
 The size of the recent directory list can be changed with: >
    let g:VxRecentDir_size = 20
@@ -143,9 +184,12 @@ is pressed on a valid mark, the cursor jumps to that mark.
 SHOW OCCURRENCES OF REGULAR EXPRESSIONS                *vimuiex-vxoccur-lib*
 
 A set of commands that search for regular expressions in files. The lines
-where matches are found are displayed in a popup listbox. A line can be 
+where matches are found are displayed in a popup listbox. A line can be
 selected from the list as described in |vimuiex-operation|. If <CR> is pressed
 on a selected line, the listbox is closed and the selected line is displayed.
+If 'v' is pressed on a selected line, the line is displayed in a preview
+window while the listbox is still shown. ( TODO: the listbox may still cover
+the preview window, needs to be resized/moved).
 
 
 VxOccur                                          *vimuiex-vxoccur*

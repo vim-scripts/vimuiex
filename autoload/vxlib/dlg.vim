@@ -5,7 +5,7 @@
 " License: GPL (http://www.gnu.org/copyleft/gpl.html)
 " This program comes with ABSOLUTELY NO WARRANTY.
 
-if vxlib#plugin#StopLoading("#au#vxlib#dlg")
+if vxlib#plugin#StopLoading('#au#vxlib#dlg')
    finish
 endif
 
@@ -17,9 +17,9 @@ endfunc
 
 function! s:DescribeFlags(flags, validFlags)
    let l:descr = ""
-   for key in sort(keys(a:validFlags), "s:CompareNoCase")
+   for key in sort(keys(a:validFlags), 's:CompareNoCase')
       if match(a:flags, '\C' . key) >= 0
-         let l:descr = l:descr . " (" . key . ")" . a:validFlags[key]
+         let l:descr = l:descr . ' (' . key . ')' . a:validFlags[key]
       endif
    endfor
    return l:descr
@@ -39,8 +39,8 @@ function! vxlib#dlg#EditFlags(flags, validFlags, exclusive, prompt, notifyEscape
    let l:flags = a:flags
    let l:nch = 0
    let l:prompt = a:prompt
-   let l:valid = join(sort(keys(a:validFlags), "s:CompareNoCase"), "")
-   let l:prompt = a:prompt . " [" . l:valid . "]:"
+   let l:valid = join(sort(keys(a:validFlags), 's:CompareNoCase'), '')
+   let l:prompt = a:prompt . ' [' . l:valid . ']:'
    while l:good && l:nch != 13
       redraw | echo l:prompt . s:DescribeFlags(l:flags, a:validFlags)
       let l:nch = getchar()
@@ -56,16 +56,16 @@ function! vxlib#dlg#EditFlags(flags, validFlags, exclusive, prompt, notifyEscape
          if l:pos < 0 
             " Remove other flags from exclusive group
             if l:grpatt != ""
-               let l:flags = substitute(l:flags, l:grpatt, "", "g")
+               let l:flags = substitute(l:flags, l:grpatt, '', 'g')
             endif
             let l:flags = l:flags . l:cch " Add
          else
-            let l:flags = substitute(l:flags, '\C' . l:cch, "", "g") " Remove
+            let l:flags = substitute(l:flags, '\C' . l:cch, '', 'g') " Remove
          endif
       endif
    endwhile
    if l:good | return l:flags
-   else | return "**"
+   else | return '**'
    endif
 endfunc
 

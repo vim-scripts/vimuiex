@@ -8,7 +8,7 @@
 "
 " (requires python; works only in terminal; using curses)
 
-if vxlib#plugin#StopLoading("#au#vimuiex#vxcapture")
+if vxlib#plugin#StopLoading('#au#vimuiex#vxcapture')
    finish
 endif
 
@@ -22,7 +22,7 @@ unmap <SID>xx
 let s:captured = []
 " =========================================================================== 
 
-function! s:argvList(skipLast)
+function! s:ArgvList(skipLast)
    let i = 0
    let args = []
    while i < argc()-a:skipLast
@@ -33,7 +33,7 @@ function! s:argvList(skipLast)
 endfunc
 
 " ------------ Any command ---------------
-function! s:getCaptured()
+function! s:GetCaptured()
    return s:captured
 endfunc
 
@@ -52,33 +52,33 @@ function! vimuiex#vxcapture#VxCmd(cmd)
    for line in t1
       call add(s:captured, vxlib#cmd#ReplaceCtrlChars(line))
    endfor
-   call vimuiex#vxlist#VxPopup(s:getCaptured(), "Command", "")
+   call vimuiex#vxlist#VxPopup(s:GetCaptured(), 'Command', '')
 endfunc
 
 function! vimuiex#vxcapture#VxCmd_QArgs(cmd)
-   let args = s:argvList(1) " skip last one - the file name
-   call vimuiex#vxcapture#VxCmd(a:cmd . " " . join(args, " "))
+   let args = s:ArgvList(1) " skip last one - the file name
+   call vimuiex#vxcapture#VxCmd(a:cmd . ' ' . join(args, ' '))
 endfunc
 
 " ------------ Marks ---------------
-function! s:getMarkList()
+function! s:GetMarkList()
    let mrks = vxlib#cmd#Capture('marks', 1)
    call filter(mrks, 'v:val =~ "^ [^ ] " ')
    let s:captured = map(copy(mrks),  'matchstr(v:val, ''.\zs.\ze'')')
    return mrks
 endfunc
 
-function! s:selectItem_marks(index)
+function! s:SelectItem_marks(index)
    let mrk = s:captured[a:index]
    exec "norm '" . mrk
 endfunc
 
 function! vimuiex#vxcapture#VxMarks()
-   call vimuiex#vxlist#VxPopup(s:getMarkList(), "Marks", "<SNR>" . s:SID . "selectItem_marks")
+   call vimuiex#vxlist#VxPopup(s:GetMarkList(), 'Marks', '<SNR>' . s:SID . 'SelectItem_marks')
 endfunc
 
 " ------------ Registers ---------------
-function! s:getRegisterList()
+function! s:GetRegisterList()
    let regs = vxlib#cmd#Capture('display', 1)
    call filter(regs, 'v:val =~ "^\"" ')
    call map(regs, 'substitute(v:val, "[ \t]\\+", " ", "g")')
@@ -86,26 +86,26 @@ function! s:getRegisterList()
    return regs
 endfunc
 
-function! s:selectItem_regs(index)
+function! s:SelectItem_regs(index)
    let reg = s:captured[a:index]
-   exec "norm " . reg . "p"
+   exec 'norm ' . reg . 'p'
 endfunc
 
 function! vimuiex#vxcapture#VxDisplay()
-   call vimuiex#vxlist#VxPopup(s:getRegisterList(), "Registers", "<SNR>" . s:SID . "selectItem_regs")
+   call vimuiex#vxlist#VxPopup(s:GetRegisterList(), 'Registers', '<SNR>' . s:SID . 'SelectItem_regs')
 endfunc
 
 " ------------ Man pages ---------------
 "  TODO: Use MANWIDTH to set the width of the output
 function! vimuiex#vxcapture#VxMan(kwd)
    "let mw = &columns - 40
-   "call vimuiex#vxcapture#VxCmd("!export MANWIDTH=" . mw ." | man -P cat " . a:kwd . " | col -b")
-   call vimuiex#vxcapture#VxCmd("!man -P cat " . a:kwd . " | col -b")
+   "call vimuiex#vxcapture#VxCmd('!export MANWIDTH=' . mw .' | man -P cat ' . a:kwd . ' | col -b')
+   call vimuiex#vxcapture#VxCmd('!man -P cat ' . a:kwd . ' | col -b')
 endfunc
 
 function! vimuiex#vxcapture#VxMan_QArgs(first)
-   let args = s:argvList(1) " skip last one - the file name
-   call vimuiex#vxcapture#VxMan(a:first . " " . join(args, " "))
+   let args = s:ArgvList(1) " skip last one - the file name
+   call vimuiex#vxcapture#VxMan(a:first . ' ' . join(args, ' '))
 endfunc
 
 " =========================================================================== 

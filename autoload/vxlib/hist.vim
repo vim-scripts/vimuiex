@@ -5,7 +5,7 @@
 " License: GPL (http://www.gnu.org/copyleft/gpl.html)
 " This program comes with ABSOLUTELY NO WARRANTY.
 
-if vxlib#plugin#StopLoading("#au#vxlib#hist")
+if vxlib#plugin#StopLoading('#au#vxlib#hist')
    finish
 endif
 
@@ -20,9 +20,9 @@ function! s:Capture(aCommand, doSplit)
 endfunc
 
 function! s:PrepareHistory()
-   if exists("s:UserHistory") | return | endif
+   if exists('s:UserHistory') | return | endif
    let s:UserHistory = {}
-   if exists("g:CUSTOM_HISTORIES")
+   if exists('g:CUSTOM_HISTORIES')
       call s:RestoreHistories()
    endif
 endfunc
@@ -32,10 +32,10 @@ function! s:SaveHistories()
    for histname in keys(s:UserHistory)
       call add(saved, ">" . histname)
       for item in s:UserHistory[histname]
-         let item = substitute(item, "\x01", "\x01\x02", "g")
-         let item = substitute(item, "\x0a", "\x01\x03", "g")
-         let item = substitute(item, "\x0d", "\x01\x04", "g")
-         call add(saved, "." . item)
+         let item = substitute(item, "\x01", "\x01\x02", 'g')
+         let item = substitute(item, "\x0a", "\x01\x03", 'g')
+         let item = substitute(item, "\x0d", "\x01\x04", 'g')
+         call add(saved, '.' . item)
       endfor
    endfor
    let g:CUSTOM_HISTORIES = join(saved, "\n")
@@ -45,11 +45,11 @@ function! s:RestoreHistories()
    let saved = split(g:CUSTOM_HISTORIES, "\n")
    let histname = ""
    for item in saved
-      let item = substitute(item, "\x01\x02", "\x01", "g")
-      let item = substitute(item, "\x01\x03", "\x0a", "g")
-      let item = substitute(item, "\x01\x04", "\x0d", "g")
+      let item = substitute(item, "\x01\x02", "\x01", 'g')
+      let item = substitute(item, "\x01\x03", "\x0a", 'g')
+      let item = substitute(item, "\x01\x04", "\x0d", 'g')
       let text = strpart(item, 1)
-      if item =~ '^.' && histname != ""
+      if item =~ '^.' && histname != ''
          call add(s:UserHistory[histname], text)
       elseif item =~ '^>'
          let s:UserHistory[text] = []

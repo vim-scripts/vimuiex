@@ -15,15 +15,15 @@
 "    EOF
 " endfunc
 
-if vxlib#plugin#StopLoading("#au#vxlib#python")
+if vxlib#plugin#StopLoading('#au#vxlib#python')
   finish
 endif
 
 " Add ~/.vim/modpython to python search path.
 " Vim-python modules should be installed in ~/.vim/modpython
 function! vxlib#python#prepare()
-   if has('python') && !exists("s:pypath")
-      let s:pypath = globpath(&runtimepath, "modpython")
+   if has('python') && !exists('s:pypath')
+      let s:pypath = globpath(&runtimepath, 'modpython')
       python import sys
       exec "python sys.path.append(r'" . s:pypath . "')"
    endif

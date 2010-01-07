@@ -8,7 +8,7 @@
 "
 " (requires python; works only in terminal; using curses)
 
-if vxlib#plugin#StopLoading("#au#vimuiex#vxdired")
+if vxlib#plugin#StopLoading('#au#vimuiex#vxdired')
    finish
 endif
 
@@ -21,27 +21,65 @@ let s:SID = substitute(maparg('<SID>xx'), '<SNR>\(\d\+_\)xx$', '\1', '')
 unmap <SID>xx
 " =========================================================================== 
 
-function! s:GetRecentDirList()
+let s:lastdir = ''
+
+function! s:GetRecentDirList_cb()
    return join(g:VxPluginVar.vxrecentfile_dirs, "\n")
 endfunc
 
+function! s:OpenFile_cb(filename, winmode)
+   call vxlib#cmd#Edit(a:filename, a:winmode)
+   let s:lastdir = fnamemodify(a:filename, ':p:h')
+   return 'q'
+endfunc
+
+" vxdired initial directory: respect browsedir setting if available
+function! s:GetStartupDir()
+   try
+      let brd = &browsedir
+   catch /.*/
+      let brd = 'buffer'
+   endtry
+   if brd == 'buffer' || s:lastdir == ''
+      let sdir = fnamemodify(bufname('%'), ':p:h') 
+   elseif brd == 'last'
+      let sdir = s:lastdir
+   else 
+      let sdir = getcwd()
+   endif
+   return sdir
+endfunc
+
+" The file browser uses an internal command 'list:dired-select' to open
+" selected items. If the selected item is a file, the internal command will
+" use the expression defined in FBrowse.callbackEditFile to construct
+" a callback and evaluate it. The internal command can accept one string
+" parameter (without quotes) which will be passed to vxlib#cmd#Edit.
 function! vimuiex#vxdired#VxFileBrowser()
    exec 'python VIM_SNR_VXDIRED="<SNR>' . s:SID .'"'
 
 python << EOF
 import vim
 import vimuiex.dired as dired
-FBrowse = dired.CFileBrowser(align="BL", autosize="VH")
-FBrowse.exprRecentDirList = "%sGetRecentDirList()" % VIM_SNR_VXDIRED
-FBrowse.process(curindex=0)
-FBrowse=None
+FBrowse = dired.CFileBrowser(optid="VxFileBrowser")
+FBrowse.exprRecentDirList = "%sGetRecentDirList_cb()" % VIM_SNR_VXDIRED
+FBrowse.callbackEditFile = "%sOpenFile_cb({{s}}, {{p}})" % VIM_SNR_VXDIRED
+# default keymap
+FBrowse.keymapNorm.setKey(r"\<cr>", "list:dired-select") # also defined in python
+FBrowse.keymapNorm.setKey(r"\<c-cr>", "list:dired-select t")
+# keymaps: xs, xt, xv
+FBrowse.keymapNorm.setKey(r"gt", "list:dired-select t")
+FBrowse.keymapNorm.setKey(r"gs", "list:dired-select s")
+FBrowse.keymapNorm.setKey(r"gv", "list:dired-select v")
 EOF
+   exec 'python FBrowse.process(curindex=0, cwd="' . s:GetStartupDir() . '")'
+   python FBrowse=None
 
 endfunc
 
-" =========================================================================== 
+" ===========================================================================
 " Global Initialization - Processed by Plugin Code Generator
-" =========================================================================== 
+" ===========================================================================
 finish
 
 " <VIMPLUGIN id="vimuiex#vxdired" require="python&&(!gui_running||python_screen)">
@@ -53,9 +91,9 @@ finish
    endfunc
 
    function! s:VIMUIEX_dired_AutoMRU(filename) " based on tmru.vim
-      if ! has_key(g:VxPluginVar, "vxrecentfile_dirs") | return | endif
-      if &buflisted && &buftype !~ 'nofile' && fnamemodify(a:filename, ":t") != ''
-         let dir = fnamemodify(a:filename, ":p:h")
+      if ! has_key(g:VxPluginVar, 'vxrecentfile_dirs') | return | endif
+      if &buflisted && &buftype !~ 'nofile' && fnamemodify(a:filename, ':t') != ''
+         let dir = fnamemodify(a:filename, ':p:h')
          let dirs = g:VxPluginVar.vxrecentfile_dirs
          let idx = index(dirs, dir, 0, g:VxRecentFile_nocase)
          if idx == -1 && len(dirs) >= g:VxRecentDir_size
@@ -68,7 +106,7 @@ finish
 
    augroup vxdired
       autocmd!
-      autocmd BufWritePost,BufReadPost  * call s:VIMUIEX_dired_AutoMRU(expand("<afile>:p"))
+      autocmd BufWritePost,BufReadPost  * call s:VIMUIEX_dired_AutoMRU(expand('<afile>:p'))
       autocmd VimLeavePre * call s:VIMUIEX_dired_SaveHistory()
    augroup END
 

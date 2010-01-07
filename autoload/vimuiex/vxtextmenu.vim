@@ -8,7 +8,7 @@
 "
 " (requires python; works only in terminal; using curses)
 
-if vxlib#plugin#StopLoading("#au#vimuiex#vxtextmenu")
+if vxlib#plugin#StopLoading('#au#vimuiex#vxtextmenu')
    finish
 endif
 
@@ -19,20 +19,19 @@ call vxlib#python#prepare()
 map <SID>xx <SID>xx
 let s:SID = substitute(maparg('<SID>xx'), '<SNR>\(\d\+_\)xx$', '\1', '')
 unmap <SID>xx
+" In console the menu might not have been loaded
+runtime! menu.vim
 " =========================================================================== 
 
-function! s:getMenu()
+function! s:GetMenu()
    " TODO: select the correct menu depending on current mode
-   redir => mns
-   exec 'silent nmenu'
-   redir END
-   let lmns = split(mns, '\n')
+   let lmns = vxlib#cmd#Capture('nmenu', 1)
    let themenu = []
    for line in lmns
-      let text = ""
-      let cmd = ""
+      let text = ''
+      let cmd = ''
       let mtitle = matchstr(line, '^\s*\d\+\s\+.\+') | " space digit space any
-      if mtitle != ""
+      if mtitle != ''
          call add(themenu, mtitle)
       endif
    endfor
@@ -48,9 +47,8 @@ exec 'python VIM_SNR_VXTEXTMENU="<SNR>' . s:SID .'"'
 python << EOF
 import vim
 import vimuiex.textmenu as menu
-Menu = menu.CTextMenu(align="TL", autosize="VH")
-Menu.loadMenuItems("%sgetMenu()" % VIM_SNR_VXTEXTMENU)
-# Menu.cmdAccept = "call ...({{i}})" # No effect for menus
+Menu = menu.CTextMenu(optid="VxTextMenu")
+Menu.loadMenuItems("%sGetMenu()" % VIM_SNR_VXTEXTMENU)
 Menu.process(curindex=0)
 Menu=None
 EOF

@@ -5,7 +5,7 @@
 " License: GPL (http://www.gnu.org/copyleft/gpl.html)
 " This program comes with ABSOLUTELY NO WARRANTY.
 
-if exists("s:vxlib_plugin_loaded")
+if exists('s:vxlib_plugin_loaded')
    finish
 endif
 let s:vxlib_plugin_loaded = 1
@@ -17,16 +17,16 @@ let s:vxlib_plugin_loaded = 1
 " @returns - nothing
 function! vxlib#plugin#CheckSetting(name, default)
    if !exists(a:name)
-      exec "let " . a:name . "=" . a:default
+      exec 'let ' . a:name . '=' . a:default
    endif
 endfunc
 
-call vxlib#plugin#CheckSetting("g:VxPlugins", "{}")
-call vxlib#plugin#CheckSetting("g:VxPluginEnabledDefault", "1")
-call vxlib#plugin#CheckSetting("g:VxPluginVar", "{}")
-call vxlib#plugin#CheckSetting("g:VxPluginLoaded", "{}")
-call vxlib#plugin#CheckSetting("g:VxPluginMissFeatures", "{}")
-call vxlib#plugin#CheckSetting("g:VxPluginErrors", "{}")
+call vxlib#plugin#CheckSetting('g:VxPlugins', '{}')
+call vxlib#plugin#CheckSetting('g:VxPluginEnabledDefault', '1')
+call vxlib#plugin#CheckSetting('g:VxPluginVar', '{}')
+call vxlib#plugin#CheckSetting('g:VxPluginLoaded', '{}')
+call vxlib#plugin#CheckSetting('g:VxPluginMissFeatures', '{}')
+call vxlib#plugin#CheckSetting('g:VxPluginErrors', '{}')
 
 " Something to autoload this module from .vimrc
 function! vxlib#plugin#Init()
@@ -114,44 +114,67 @@ function! vxlib#plugin#List()
          endif
       endif
    endfor
-   if len(loaded) > 0 | echo "Loaded:"
+   if len(loaded) > 0 | echo 'Loaded plugins:'
       for k in loaded
-         echo "   " . g:VxPluginLoaded[k] . " " . k
+         echo '   ' . g:VxPluginLoaded[k] . ' ' . k
       endfor
    endif
-   if len(disabled) > 0 | echo "Disabled:"
+   if len(disabled) > 0 | echo 'Disabled plugins:'
       for k in disabled
-         echo "   " . g:VxPluginLoaded[k] . " " . k
+         echo '   ' . g:VxPluginLoaded[k] . ' ' . k
       endfor
    endif
-   if len(missing) > 0 | echo "Reuqired features not available:"
+   if len(missing) > 0 | echo 'Reuqired features not available:'
       for k in missing
-         echo "   " . g:VxPluginLoaded[k] . " " . k . "\t" . get(g:VxPluginMissFeatures, k, "?")
+         echo '   ' . g:VxPluginLoaded[k] . ' ' . k . "\t" . get(g:VxPluginMissFeatures, k, '?')
       endfor
    endif
-   if len(errors) > 0 | echo "Failed to load:"
+   if len(errors) > 0 | echo 'Plugins failed to load:'
       for k in errors
-         echo "   " . g:VxPluginLoaded[k] . " " . k . "\t" . get(g:VxPluginErrors, k, "?")
+         echo '   ' . g:VxPluginLoaded[k] . ' ' . k . "\t" . get(g:VxPluginErrors, k, '?')
       endfor
    endif
    let enabled = keys(g:VxPlugins)
    call sort(enabled)
-   if len(enabled) > 0 | echo "Explicitly Enabled/Disabled:"
+   if len(enabled) > 0 | echo 'Plugins explicitly enabled/disabled:'
       for k in enabled
-         echo "   " . g:VxPlugins[k] . " " . k
+         echo '   ' . g:VxPlugins[k] . ' ' . k
       endfor
    endif
 
    " Doesn't work with VxCmd: double call to #Capture! --> redir
    "let loaded = vxlib#cmd#Capture(":let", 1)
    "call filter(loaded, 'v:val =~ "^loaded_"')
-   "if len(loaded) > 0 | echo "Other plugins:"
+   "if len(loaded) > 0 | echo 'Other plugins:'
    "   call map(loaded, 'matchstr(v:val, "^loaded_\\zs.*$")')
    "   for line in loaded
-   "      echo "   " . line
+   "      echo '   ' . line
    "   endfor
    "endif
 endfunc
 
+function! s:VxLet(dict, key, ...)
+   if ! exists('g:' . a:dict)
+      exec 'let g:' . a:dict . '={}'
+   endif
+   let value = join(a:000, ' ')
+   if value != "" 
+      exec 'let g:' . a:dict . "['" . a:key . "']=" . value
+   endif
+endfunc
+command -nargs=+ VxLet call s:VxLet(<f-args>)
+" TODO: VxLet - add completion with function (for 0=global dictionaries, 1=keys)
+
+function! s:VxStatus()
+   if vxlib#plugin#IsLoaded("vimuiex#vxcapture")
+      VxCmd call vxlib#plugin#List()
+   else
+      call vxlib#plugin#List()
+   endif
+endfunc
+command VxStatus call s:VxStatus()
+
 " Special case: can't use #StopLoading before it is created.
-call vxlib#plugin#SetLoaded("#au#vxlib#plugin", 1)
+call vxlib#plugin#SetLoaded('#au#vxlib#plugin', 1)
+
+

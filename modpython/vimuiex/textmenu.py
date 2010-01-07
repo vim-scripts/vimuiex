@@ -72,7 +72,7 @@ class CTextMenu(popuplist.CList):
         self.curitems = [] # list of positions of currently displayed items
         self.modifyKeymaps()
         self.submenuIcon = "+ "
-        self.autosize += "C"
+        self._firstColumnAlign = True # self.autosize += "C"
         self.maxColumnWidth = 0.7
 
     # Assign missing quickchars; TODO: move to CList?

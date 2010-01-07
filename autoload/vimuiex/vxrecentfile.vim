@@ -8,7 +8,7 @@
 "
 " (requires python)
 
-if vxlib#plugin#StopLoading("#au#vimuiex#vxrecentfile")
+if vxlib#plugin#StopLoading('#au#vimuiex#vxrecentfile')
    finish
 endif
 
@@ -26,21 +26,35 @@ unmap <SID>xx
 " -------------------------------------------------------
 
 let s:SHOWNFILES=[]
-function! s:getRecentFiles()
+function! s:GetRecentFiles()
    let s:SHOWNFILES = []
    for item in g:VxPluginVar.vxrecentfile_files
-      call add(s:SHOWNFILES, fnamemodify(item, ":t") . "\t" . fnamemodify(item, ":p:~:h"))
+      call add(s:SHOWNFILES, fnamemodify(item, ':t') . "\t" . fnamemodify(item, ':p:~:h'))
    endfor
    return s:SHOWNFILES
 endfunc
 
-function! s:selectItem_cb(index)
+function! s:SelectFile_cb(index, winmode)
    let filename = s:SHOWNFILES[a:index]
    let fparts = split(filename, "\t")
-   let filename = fparts[1] . "/" . fparts[0]
-   let filename = fnamemodify(filename, ":p")
+   let filename = fparts[1] . '/' . fparts[0]
+   let filename = fnamemodify(filename, ':p')
 
-   call vxlib#cmd#Edit(filename)
+   call vxlib#cmd#Edit(filename, a:winmode)
+   return 'q'
+endfunc
+
+function! s:SelectMarkedFiles_cb(marked, index, winmode)
+   if len(a:marked) < 1
+      return s:SelectFile_cb(a:index, a:winmode)
+   endif
+   only
+   let first = 1
+   for idx in a:marked
+      call s:SelectFile_cb(idx, first ? '' : a:winmode)
+      let first = 0
+   endfor
+   return 'q'
 endfunc
 
 function! vimuiex#vxrecentfile#VxOpenRecentFile()
@@ -49,9 +63,16 @@ exec 'python VIM_SNR_VXRECENTFILES="<SNR>' . s:SID .'"'
 python << EOF
 import vim
 import vimuiex.popuplist as lister
-List = lister.CList(title="Recent files", autosize="HC", align="")
-List.loadVimItems("%sgetRecentFiles()" % VIM_SNR_VXRECENTFILES)
-List.cmdAccept = "call %sselectItem_cb({{i}})" % VIM_SNR_VXRECENTFILES
+# TODO: VxOpenRecentFile: align first column
+List = lister.CList(title="Recent files", optid="VxOpenRecentFile")
+List.loadVimItems("%sGetRecentFiles()" % VIM_SNR_VXRECENTFILES)
+List.cmdAccept = "%sSelectMarkedFiles_cb({{M}}, {{i}}, '')" % VIM_SNR_VXRECENTFILES
+List.keymapNorm.setKey(r"\<s-cr>", "vim:%sSelectMarkedFiles_cb({{M}}, {{i}}, 't')" % VIM_SNR_VXRECENTFILES)
+# x-"execute" 
+List.keymapNorm.setKey(r"gs", "vim:%sSelectMarkedFiles_cb({{M}}, {{i}}, 's')" % VIM_SNR_VXRECENTFILES)
+List.keymapNorm.setKey(r"gv", "vim:%sSelectMarkedFiles_cb({{M}}, {{i}}, 'v')" % VIM_SNR_VXRECENTFILES)
+List.keymapNorm.setKey(r"gt", "vim:%sSelectMarkedFiles_cb({{M}}, {{i}}, 't')" % VIM_SNR_VXRECENTFILES)
+List._firstColumnAlign = True
 # TODO: s - split, v - vsplit
 List.process(curindex=0)
 List=None
@@ -74,8 +95,8 @@ finish
    endfunc
 
    function! s:VIMUIEX_recentfile_AutoMRU(filename) " based on tmru.vim
-      if ! has_key(g:VxPluginVar, "vxrecentfile_files") | return | endif
-      if &buflisted && &buftype !~ 'nofile' && fnamemodify(a:filename, ":t") != ''
+      if ! has_key(g:VxPluginVar, 'vxrecentfile_files') | return | endif
+      if &buflisted && &buftype !~ 'nofile' && fnamemodify(a:filename, ':t') != ''
          if g:VxRecentFile_exclude != '' && a:filename =~ g:VxRecentFile_exclude
             return
          endif
@@ -91,7 +112,7 @@ finish
 
    augroup vxrecentfile
       autocmd!
-      autocmd BufWritePost,BufReadPost * call s:VIMUIEX_recentfile_AutoMRU(expand("<afile>:p"))
+      autocmd BufWritePost,BufReadPost * call s:VIMUIEX_recentfile_AutoMRU(expand('<afile>:p'))
       autocmd VimLeavePre * call s:VIMUIEX_recentfile_SaveHistory()
    augroup END
 

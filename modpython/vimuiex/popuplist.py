@@ -11,23 +11,23 @@ import time
 import vim
 import simplekeymap
 import ioutil
+import boxposition
 
 # TODO: vimuiex init script when the list is used for the first time: copy vars from vim to python
-BORDER = (2, 2) # Drawing errors in curses when w > &columns-12
 # import the correct listbox implementation
 __listbox = None
 def importListboxImpl():
-    global __listbox, BORDER
+    global __listbox
     if __listbox != None: return __listbox
     if ioutil.PLATFORM == "vim.screen":
         import vimuiex._popuplist_screen as __listbox
-        BORDER = (2, 2)
+        boxposition.setBorder(2, 2)
     elif ioutil.PLATFORM == "curses":
-        import vimuiex._popuplist_screen as __listbox #TODO: Unify in _screen
-        BORDER = (12, 4) # Drawing errors in curses when w > &columns-12
+        import vimuiex._popuplist_screen as __listbox
+        boxposition.setBorder(12, 4) # Drawing errors in curses when w > &columns-12
     elif ioutil.PLATFORM == "wx":
         import vimuiex._popuplist_wx as __listbox
-        BORDER = (2, 2)
+        boxposition.setBorder(2, 2)
     else:
         raise SystemError("VimUiEx: Invalid platform")
 
@@ -46,7 +46,7 @@ class CListItem(object):
         self.flags = 0
         self._text = text
         self.quickchar = None
-        self.selected = 0
+        self.marked = 0
 
     @property
     def displayText(self):
@@ -60,9 +60,8 @@ class CListItem(object):
 #       TAB moves to next occurence; needed eg. with VxMan;
 # TODO: add default search mode for /: i-search or filter
 # TODO: implement multiline list items (eg. up to 3 lines)
-# TODO: pack listbox positioning in a separate class
 class CList(object):
-    def __init__(self, title="", position=None, align=None, size=None, autosize=None):
+    def __init__(self, title="", optid=""):
         """
         position: (x, y); if None, center the listbox
         align:    alignment string (eg. "TL", "BR", "T", ...); overrides position
@@ -75,12 +74,16 @@ class CList(object):
         if title != None: self.title = title
         else: self.title = ""
         self.titleAlign = "<"
-        self.position = position
-        self.align = align
-        self.size = size
-        self.minSize = (16, 4)
-        self.autosize = autosize
+        self.position = None
+        self.size = None
+        self.posManager = boxposition.CBoxPositioner(self)
+        if optid == None: optid = ""
+        options = vim.eval("vimuiex#vxlist#GetPosOptions('%s')" % optid)
+        self.posManager.parseOptions(options)
+        self._firstColumnAlign = False
         self._firstColumnWidth = None # property: Width of the first column
+        self._resizeOnFilter = False
+        self._moveDownOnMark = True
         self.maxColumnWidth = 0.3
         self.allitems = []
         self.strFilter = "" 
@@ -142,6 +145,7 @@ class CList(object):
         kn.setKey(r"i", "numselect")
         kn.setKey(r"#", "numselect")
         kn.setKey(r"q", "quit")
+        kn.setKey(r"m", "togglemarked")
         kn.setKey(r"\<Esc>", "quit")
         kn.setKey(r"\<CR>", "accept")
         kn.setKey(r"wk", "winpos:align-top")
@@ -175,32 +179,39 @@ class CList(object):
 
     # TODO: 3. python: eval a python command
     def doCommand(self, cmd, curindex):
-        if cmd.startswith("list:"): cmd = self.doListCommand(cmd[5:].strip(), curindex)
+        if cmd.startswith("list:"):
+            cmd = self.doListCommand(cmd[5:].strip(), curindex)
         elif cmd.startswith("winpos:"):
             self.doWinposCmd(cmd[7:].strip())
             cmd = ""
-        elif cmd.startswith("vim:"): return "" # TODO
+        elif cmd.startswith("vim:"):
+            cmd = self.doVimCallback(cmd[4:].strip(), curindex)
+            vim.command("redraw!")
+            self.redraw()
+            # cmd = ""
         return cmd
 
     def doWinposCmd(self, cmd):
-        def _realign(remove, add):
-            if self.align == None: align = ""
-            else: align = self.align.lower()
-            if remove != None:
-                for ch in remove: align = align.replace(ch, "")
-            if add != None: align += add
-            self.align = align
-            self.relayout(position=True, size=False)
-        if cmd == "align-left": _realign("r", "l")
-        elif cmd == "align-right": _realign("l", "r")
-        elif cmd == "align-top": _realign("b", "t")
-        elif cmd == "align-bottom": _realign("t", "b")
-        elif cmd == "align-hceneter": _realign("lr", "")
-        elif cmd == "align-vceneter": _realign("tb", "")
-        elif cmd == "align-ceneter": _realign("lrtb", "")
+        if cmd == "align-left": flag = "l"
+        elif cmd == "align-right": flag = "r"
+        elif cmd == "align-top": flag = "t"
+        elif cmd == "align-bottom": flag = "b"
+        elif cmd == "align-hceneter": flag = "h"
+        elif cmd == "align-vceneter": flag = "v"
+        elif cmd == "align-ceneter": flag = "c"
+        else: return
+        self.reposition(flag)
 
     def doListCommand(self, cmd, curindex):
         return cmd
+
+    def doVimCallback(self, cmd, curindex):
+        try:
+            cmd = self.expandVimCommand(cmd, curindex)
+            rv = vim.eval(cmd)
+            if rv == "q": return "quit"
+        except: pass
+        return ""
 
     def redraw(self):
         if self.__listbox != None: self.__listbox.redraw()
@@ -210,9 +221,15 @@ class CList(object):
         self._firstColumnWidth = None
         if self.__listbox != None: self.__listbox.refreshDisplay()
 
+    def onFilterChanged(self, old, new):
+        pass
+
     def setFilter(self, strFilter = ""):
         if strFilter == self.strFilter: return
+        old = self.strFilter
         self.strFilter = strFilter
+        self.onFilterChanged(old, strFilter)
+        if self._resizeOnFilter: self.relayout(size=True)
         self.refreshDisplay()
 
     def setCurIndex(self, index):
@@ -276,36 +293,11 @@ class CList(object):
 
     def expandVimCommand(self, command, curindex):
         i = self.getTrueIndex(curindex)
-        return command.replace("{{i}}", "%d" % (i))
-        pass
-
-    def _maxSize(self):
-        (w, h) = vimScreenSize()
-        w -= BORDER[0];
-        h -= BORDER[1];
-        return (w, h)
-
-    def _limitSize(self, sx, sy):
-        w, h = self._maxSize()
-        if self.minSize[0] > w: self.minSize[0] = w
-        if self.minSize[1] > h: self.minSize[1] = h
-        if sx < self.minSize[0]: sx = self.minSize[0]
-        if sy < self.minSize[1]: sy = self.minSize[1]
-        if sx > w: sx = w
-        if sy > h: sy = h
-        return (sx, sy)
-
-    def _limitPosition(self, x, y, size=None):
-        w, h = self._maxSize()
-        if size == None: sx, sy = self.size
-        else: sx, sy = size
-        l = BORDER[0] / 2
-        t = BORDER[1] / 2
-        if x < l: x = l
-        if y < t: y = t
-        if x - l + sx > w: x = w - sx + l
-        if y - t + sy > h: y = h - sy + l
-        return (x, y)
+        cmd = command.replace("{{i}}", "%d" % (i))
+        if command.find("{{M}}") > 0:
+            marks = ",".join(["%d" % (i) for i,item in enumerate(self.allitems) if item.marked])
+            cmd = cmd.replace("{{M}}", "[" + marks + "]")
+        return cmd
     
     def calcFirstColumnWidth(self, textwidth, items):
         mwf = self.maxColumnWidth
@@ -322,52 +314,39 @@ class CList(object):
         return wopt
 
     def getFirstColumnWidth(self, textwidth=None):
-        if self.autosize.lower().find("c") < 0: return None
+        if not self._firstColumnAlign: return None
         if self._firstColumnWidth != None: return self._firstColumnWidth
-        if textwidth == None or textwidth < 1: textwidth = self.size[0]
+        if textwidth == None or textwidth < 1:
+            if self.posManager.autosize.x: textwidth = self.posManager.maxSize.x - 2
+            else: textwidth = self.size.x - 2
         wopt = self.calcFirstColumnWidth(textwidth, self.items)
         if wopt > 0: self._firstColumnWidth = wopt
         return self._firstColumnWidth
 
+    # TODO: optimize size calculation (cache results)
+    def getMaxWidth(self):
+        if len(self.allitems) < 1: return 0
+        return max([len(li.displayText) for li in self.allitems]) + 2
+
+    def getMaxHeight(self):
+        return len(self.allitems) + 2
+
     def relayout(self, position=True, size=True):
-        w, h = self._maxSize()
-        if size and self.autosize != None:
-            sx, sy = self.size
-            autosize = self.autosize.lower()
-            if autosize.find("v") >= 0: sy = len(self.allitems) + 2
-            if autosize.find("h") >= 0:
-                if len(self.allitems) < 1: sx = 0
-                else: sx = max([len(li.displayText) for li in self.allitems]) + 2
-            self.size = self._limitSize(sx, sy)
-
-        if position and self.align != None:
-            x, y = self.position
-            l = BORDER[0] / 2
-            t = BORDER[1] / 2
-            align = self.align.lower()
-            if align.find("t") >= 0: y = t
-            elif align.find("b") >= 0: y = h - self.size[1] + t
-            else: y = (h - self.size[1]) / 2
-            if align.find("l") >= 0: x = l
-            elif align.find("r") >= 0: x = w - self.size[0] + l
-            else: x = (w - self.size[0]) / 2
-            self.position = self._limitPosition(x, y)
-
+        if position and size: self.posManager.relayout()
+        elif position: self.posManager.reposition()
+        elif size: self.posManager.relayout() # repositioning is required after resize
         if self.__listbox != None:
             self.__listbox.relayout(self.position, self.size)
 
-    def _calcInitialPosition(self):
-        w, h = self._maxSize()
-        if self.size == None: self.size = (w/2, h/2)
-        l = BORDER[0] / 2
-        t = BORDER[1] / 2
-        if self.position == None: self.position = (l + w/4, t + h/4)
-        self.relayout()
+    def reposition(self, pointDef):
+        self.posManager.reposition(pointDef)
+        if self.__listbox != None:
+            self.__listbox.relayout(self.position, self.size)
 
     def process(self, curindex = 0, startmode = 1): # TODO: startmode=sth.NORMAL
         lbimpl = importListboxImpl()
         if lbimpl == None: return
-        self._calcInitialPosition()
+        self.relayout()
 	self.__listbox = lbimpl.createListboxView(position=self.position, size=self.size)
 	self.__listbox.setItemList(self)
 	exitcmd = self.__listbox.process(curindex, startmode)
@@ -383,5 +362,5 @@ class CList(object):
                 if inspect.isfunction(cmd): cmd(self.getTrueIndex(idx))
                 elif type(cmd) == type("") and cmd != "":
                     cmd = self.expandVimCommand(cmd, idx)
-                    vim.command(cmd)
+                    vim.eval(cmd)
 

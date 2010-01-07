@@ -229,10 +229,10 @@ class MyFrame(wx.Frame):
 class CPopupListbox:
     def __init__(self, position, size):
         self.itemlist = None
-        self.left = position[0]
-        self.top = position[1]
-        self.width = size[0]
-        self.height = size[1]
+        self.left = position.x
+        self.top = position.y
+        self.width = size.x
+        self.height = size.y
         self.title = ""
         self.curindex = 0
         self.__frame = None
@@ -263,10 +263,10 @@ class CPopupListbox:
         pass
 
     def relayout(self, position, size):
-        self.left = position[0]
-        self.top = position[1]
-        self.width = size[0]
-        self.height = size[1]
+        self.left = position.x
+        self.top = position.y
+        self.width = size.x
+        self.height = size.y
         if self.__frame == None: return
         cw, ch = vimCharSize()
         x, y = vimWindowPos()

@@ -1,7 +1,7 @@
 *vimuiex.txt*        User Interface Extensions      Last Change: November 2009
 
 User Interface Extensions (Experiment)
-		       Version 0.5
+		       Version 0.6
 
   Description                     |vimuiex|	      
   Default popup list operation    |vimuiex-operation|   
@@ -51,6 +51,7 @@ The following commands are available when in normal operation:
    <CR>			     select the current item and execute a command
    wh, wj, wk, wl	     move window to border
    wc, wv, wC		     center window
+   m                         toggle item marked state
 
 				       *vimuiex-filtering*
 In filtering mode new ASCII characters are added to the filter and only the 
@@ -81,7 +82,42 @@ selected when the appropriate key is pressed. Otherwise pressing the key will
 cycle between the items and <CR> must be pressed to select the item.
 
 ==============================================================================
-PYTHON LIBRARY USAGE				          *vimuiex-pythonlib*
+POPUP LIST CONFIGURATION				*vimuiex-config*
+
+Position of the listbox for each plugin:
+>
+   call vxlib#plugin#Init()
+   VxLet VxPopupListPos <plugin-id> "<plugin-options>"
+<
+where <plugin-id> is usually the command associated with the plugin.
+The available options are:
+    size=x,y	size of the popuplist; absolute or relative
+		x,y integer => absolute size
+                x,y float   => relative size
+    minsize=x,y	minimal size of the popuplist; absolute or relative
+		x,y same as above
+    position=F	position of the popuplist
+		F=[ltrbvhc]*  align to border (l/t/r/b) or center (v/h/c)
+		F=Nxy   divide the screen in NxN cells and align to cell xy
+			where 1<=x,y<=N
+    autosize=F  F=[vh]* autosize the box in direction (v/h) according to the
+			size of the list content
+    firstcolumn=b	b=[01]; not yet
+    startupmode=F	F=[/%#]; not yet
+
+Example:
+  1. By default align all popup listboxes to bottom-left, let the size of each
+  popup box be 1/2 of the screen:
+>
+  VxLet VxPopupListPos default "position=bl size=0.5,0.5"
+<
+  2. When using VxBufListSelect show the box in the upper middle position of
+  the screen, let min size be 8 lines and 1/2 of available width:
+>
+  VxLet VxPopupListPos VxBufListSelect "position=532 minsize=0.5,8"
+<
+==============================================================================
+PYTHON LIBRARY USAGE				        *vimuiex-pythonlib*
 
 
 Example: Display a list of buffers		       *vimuiex-list-example*
@@ -168,6 +204,21 @@ obtained with the function gwx.vimPrepareWx().
 
 Initial position of the window			  *vimuiex-python-position*
 
+TODO: Changed in version 0.6.
+Example: >
+      call vxlib#plugin#Init()
+      VxLet VxPopupListPos default "position=525"
+      VxLet VxPopupListPos VxBufListSelect "position=534 minsize=0.5,8"
+      VxLet VxPopupListPos VxOpenRecentFile "position=534 minsize=0.5,8"
+      VxLet VxPopupListPos VxTextMenu "position=524"
+<
+  Interpretation:
+    position=534    grid=5x5 cells, align to cell (col=3,row=4)
+		    cell numbers start with 1
+    minsize=0.5,8   50% of width, 8 lines
+
+Version 0.5:
+
 When creating a CList or CTextMenu the size and position of the popup listbox 
 can be specified as construction parameters:
 
@@ -188,7 +239,7 @@ INSTALLATION						*vimuiex-installation*
 
 To install:
   - Download the vimuiex.zip.
-  - Extract the zip archive into your runtime directory.
+  - Extract the zip archive into your runtime directory (eg. ~/.vim).
   - Start Vim or goto an existing instance of Vim.
   - Execute the following command:
 >
@@ -197,12 +248,16 @@ To install:
     This will generate all the help tags for any file located in the doc
     directory.
 
-To use the library in GVim a patch must be applied to Vim source.
+To use the library in GVim a patch must be applied to Vim source. The patch is
+available at:
+  http://sourceforge.net/projects/vimuiex/files/
 
-Windows: install Python (http://www.python.org). GVim 7.2 requires Python 2.4.
+Windows: Python must be installed (http://www.python.org). A patch must be
+applied to Vim source. The patch and prebuilt binaries are available at:
+  http://sourceforge.net/projects/vimuiex/files/
 
 Note: In versions 0.1 - 0.4 a wxpython implementation was also available. The
-implementation was not updated and tested in version 0.5.
+implementation was not updated and tested in versions 0.5-0.6.
 ==============================================================================
 TESTING							     *vimuiex-testing*
 

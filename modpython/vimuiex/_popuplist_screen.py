@@ -78,10 +78,10 @@ class CPopupListbox(object):
     NUMSELECT = 4
     def __init__(self, position, size): # TODO: CWinArranger
         self.itemlist = None # CList
-        self.left = position[0]
-        self.top = position[1]
-        self.width = size[0]
-        self.height = size[1]
+        self.left = position.x
+        self.top = position.y
+        self.width = size.x
+        self.height = size.y
         self.window = None
         self.wcontent = None
         self.textwidth = self.width - 2
@@ -96,9 +96,9 @@ class CPopupListbox(object):
         self.numselect.setMaxNumber(self.lastline)
         self.yPrompt = int(vim.eval("&lines")) - 1
         self.lastclick = (-1, -1) # last mouse click
-        self.initColors()
+        self.initPlatform()
 
-    def initColors(self):
+    def initPlatform(self):
         pass
 
     @property
@@ -164,10 +164,12 @@ class CPopupListbox(object):
 
     def getLineStr(self, text, lineno):
         if text.find("\t") >= 0:
-            cw = self.itemlist.getFirstColumnWidth(self.textwidth)
+            cw = self.itemlist.getFirstColumnWidth()
             if cw != None:
-                cols = text.split("\t", 1)
-                text = "%*s %s" % (-cw, cols[0].rstrip(), cols[1].lstrip())
+                pos = text.find("\t")
+                if pos >= 0 and pos <= cw:
+                    cols = text.split("\t", 1)
+                    text = "%*s %s" % (-cw, cols[0].rstrip(), cols[1].lstrip())
             text = text.expandtabs(8)
         w = self.textwidth # - 1
         if self.hoffset > 0:
@@ -187,8 +189,8 @@ class CPopupListbox(object):
         #    else: nl = nl + ch
         #line = nl
 
-        # TODO: return line.encode(globals.gcurses.code) # not working with utf-8 (py 2.5, py-curses 2.2)
-        return line.encode("ascii", "replace") # unknown chars replaced with ?
+        # FIXME: outputEncoding: double-width characters will break the display
+        return line.encode(self.outputEncoding, "replace") # unknown chars replaced with ?
 
     def drawItems(self):
         y = 0
@@ -202,8 +204,11 @@ class CPopupListbox(object):
         for i in xrange(top, self.itemCount):
             y = i - top
             if y > self.lastline: break
+            marked = items[i].marked
             line = self.getLineStr(items[i].displayText, y)
-            if i == self.curindex: co = self.coSelected
+            if i == self.curindex and marked: co = self.coSelMarked
+            elif i == self.curindex: co = self.coSelected
+            elif marked: co = self.coMarked
             else: co = self.coNormal
             if y < self.lastline: win.addstr(y, 0, line, co)
             else: win.insstr(y, 0, line, co)
@@ -343,6 +348,13 @@ class CPopupListbox(object):
         elif cmd == "numselect-delete":
             self.numselect.curNumber = ""
             self.drawLastLine()
+        elif cmd == "togglemarked":
+            items = self.itemlist.items
+            if self.curindex >= 0 and self.curindex < len(items):
+                items[self.curindex].marked = not items[self.curindex].marked
+                if self.itemlist._moveDownOnMark: self.setCurIndex(self.curindex + 1, redraw=True)
+                else: self.setCurIndex(self.curindex, redraw=True)
+                # TODO: Redraw only current item on togglemarked
         pass
 
     def _buildPrompt(self):
@@ -376,10 +388,10 @@ class CPopupListbox(object):
 
     def relayout(self, position, size):
         self.hide()
-        self.left = position[0]
-        self.top = position[1]
-        self.width = size[0]
-        self.height = size[1]
+        self.left = position.x
+        self.top = position.y
+        self.width = size.x
+        self.height = size.y
         self.window = None
         self.wcontent = None
         self.show()
@@ -482,20 +494,27 @@ class CPopupListbox(object):
         return self.exitcommand
 
 class CPopupListboxScreen(CPopupListbox):
-    def initColors(self):
+    def initPlatform(self):
+        # TODO: create user setting in vim for outputEncoding
+        self.outputEncoding = vim.eval("&encoding")
         try:
             self.coNormal = vim.screen.getHighlightAttr("VxNormal")
             self.coSelected = vim.screen.getHighlightAttr("VxSelected")
             self.coHilight = vim.screen.getHighlightAttr("VxQuickChar")
+            self.coMarked = vim.screen.getHighlightAttr("VxMarked")
+            self.coSelMarked = vim.screen.getHighlightAttr("VxSelMarked")
             if self.coNormal == self.coSelected: raise
         except:
             self.coNormal = 1
             self.coSelected = 0
             self.coHilight = 3
+            self.coMarked = 4
+            self.coSelMarked = self.coSelected
     pass
 
 class CPopupListboxCurses(CPopupListbox):
-    def initColors(self):
+    def initPlatform(self):
+        self.outputEncoding = "ascii" # TODO: create user setting in vim
         import curses
         if curses.has_colors():
             curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_WHITE)
@@ -508,5 +527,7 @@ class CPopupListboxCurses(CPopupListbox):
             self.coNormal = curses.A_NORMAL
             self.coSelected = curses.A_UNDERLINE
             self.coHilight = curses.A_UNDERLINE
+            self.coMarked = self.coHilight
+            self.coSelMarked = self.coSelected
     pass
 

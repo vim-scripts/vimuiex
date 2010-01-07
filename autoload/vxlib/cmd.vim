@@ -5,7 +5,7 @@
 " License: GPL (http://www.gnu.org/copyleft/gpl.html)
 " This program comes with ABSOLUTELY NO WARRANTY.
 
-if vxlib#plugin#StopLoading("#au#vxlib#cmd")
+if vxlib#plugin#StopLoading('#au#vxlib#cmd')
    finish
 endif
 
@@ -23,7 +23,7 @@ function! vxlib#cmd#CaptureShell(aCommand)
 endfunc
 
 function! vxlib#cmd#Capture(aCommand, doSplit)
-   let l:capture = ""
+   let l:capture = ''
    redir => l:capture
    exec 'silent ' . a:aCommand
    redir END
@@ -33,36 +33,155 @@ function! vxlib#cmd#Capture(aCommand, doSplit)
    return l:capture
 endfunc
 
-function! s:initCtrlTr()
-   let s:trFrom = ""
-   let s:trTo = ""
+function! s:InitCtrlTr()
+   let s:trFrom = ''
+   let s:trTo = ''
    for i in range(32)
       if i == 0 || i == 9 | continue | endif
       let s:trFrom = s:trFrom . nr2char(i)
-      let s:trTo = s:trTo . " "
+      let s:trTo = s:trTo . ' '
    endfor
 endfunc
-call s:initCtrlTr()
+call s:InitCtrlTr()
 
 function! vxlib#cmd#ReplaceCtrlChars(text)
    return tr(a:text, s:trFrom, s:trTo)
 endfunc
 
-function! vxlib#cmd#Edit(filename)
-   " This code is copied from tmru#Edit
-   let bn = bufnr(a:filename)
-   if bn != -1 && buflisted(bn)
-      exec 'buffer '. bn
+" \param [winmode]:
+"        s-split
+"        v-vertical split
+"        t-open in new tab (if not displayed). Based on BufExplorer behaviour.
+function! vxlib#cmd#GotoBuffer(bufnr, ...)
+   let winmode = ''
+   if a:0 > 0
+      let winmode = a:1
+   endif
+   if winmode == 's' | exec 'split +buffer' . a:bufnr
+   elseif winmode == 'v' |exec 'vsplit +buffer' . a:bufnr 
+   else
+      let btab = vxlib#win#GetTabNr(0 + a:bufnr)
+      if btab < 1 " buffer not displayed
+         if winmode == 't' | exec '999tab split +buffer' . a:bufnr 
+         else | exec 'buffer ' . a:bufnr
+         endif
+      else " buffer is displayed in a tab
+         exec btab . 'tabnext'
+         let bwin = vxlib#win#GetTabWinNr(btab, a:bufnr)
+         exec bwin . 'wincmd w'
+      endif
+   endif
+endfunc
+
+" \param filename: an existing filename
+" \param [winmode]: \see #GotoBuffer
+" result:
+"     -1    file not readable
+"     -2    error while loading
+"      1    file was already in buffer, buffer was selected
+"      2    file loadede and selected
+function! vxlib#cmd#Edit(filename, ...)
+   if a:0 > 0 | let winmode = a:1 | else | let winmode = '' | endif
+   let bnr = bufnr(a:filename)
+   if bnr != -1 && bufexists(bnr)
+      call vxlib#cmd#GotoBuffer(bnr, winmode)
+      return 1
    elseif filereadable(a:filename)
       try
-         exec 'edit '. fnameescape(a:filename)
+         if winmode == "s" | exec 'split ' . fnameescape(a:filename)
+         elseif winmode == "v" | exec 'vsplit ' . fnameescape(a:filename) 
+         elseif winmode == "t" | exec 'tabedit ' .fnameescape(a:filename)
+         else | exec 'edit '. fnameescape(a:filename)
+         endif
+         return 2
       catch
          echohl error
          echom v:errmsg
          echohl NONE
+         return -2
       endtry
    else
-      echom "File not readable: ". a:filename
+      echom 'File not readable: '. a:filename
+      return -1
    endif
 endfunc
+
+" \param filename: (use '' or '%' for current file)
+" \param line, column:   the position to jump to
+" \param [zflags]:       string with flags
+"     O     execute zO on closed folds
+"     z     execute zz
+" \param [winmode]: \see #GotoBuffer
+function! vxlib#cmd#EditLine(filename, line, column, ...)
+   let isopen = 1
+   if a:0 > 0 | let zflags = a:1 | else | let zflags = '' | endif
+   if a:0 > 1 | let winmode = a:2 | else | let winmode = '' | endif
+   if a:filename != '' && a:filename != '%'
+      let isopen = vxlib#cmd#Edit(a:filename, winmode)
+      if isopen <= 0
+         return isopen
+      endif
+   endif
+   call setpos('.', [0, a:line, a:column, 0])
+   " Unfold and center
+   if v:foldlevel > 0 && match(zflags, 'O') >= 0
+      norm zO
+   endif
+   if match(zflags, 'z') >= 0
+      norm zz
+   endif
+   return isopen
+endfunc
+
+" Display a file/buffer in the preview window and jump to line. Unfold the
+" line to make it visible.
+"
+" filenameOrBufnr
+"        file name or number of the buffer to display
+"        "%" for current file
+function! vxlib#cmd#PreviewLine(filenameOrBufnr, line)
+   let lnn = a:line
+   if lnn < 1
+      let lnn = 1
+   endif
+   let fname = a:filenameOrBufnr
+   if type(fname) == type(0)
+      let fname = bufname(fname)
+   endif
+   if fname == '%'
+      let fname = bufname('%')
+   endif
+   if fname == '' 
+      return
+   endif
+   exec 'pedit ' . '+' . a:line . ' ' . fname
+   let pwnr=vxlib#win#GetPreviewWinNr()
+   if pwnr > 0
+      let wnr = winnr()
+      exec pwnr . 'wincmd w'
+      set cursorline
+      call vxlib#cmd#EditLine('%', a:line, 1, 'zO')
+      exec wnr . 'wincmd w'
+   endif
+endfunc
+
+function! vxlib#cmd#ShowQFixPreview()  
+   let lnn = line('.')
+   let pos = getqflist()[lnn-1]
+   call vxlib#cmd#PreviewLine(pos['bufnr'], pos['lnum'])
+endfunc
+
+function! vxlib#cmd#PrepareQFixPreview()
+   nmap <silent> <Space> :call vxlib#cmd#ShowQFixPreview()<CR>
+   nnoremap <silent> <CR> :pclose<CR><CR>
+endfunc
+
+" =========================================================================== 
+" Global Initialization - Processed by Plugin Code Generator
+" =========================================================================== 
+finish
+
+" <VIMPLUGIN id="vxlib#quickfixpreview" require="windows&&quickfix">
+   autocmd FileType qf call vxlib#cmd#PrepareQFixPreview()
+" </VIMPLUGIN>
 

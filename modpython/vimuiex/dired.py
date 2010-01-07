@@ -21,7 +21,7 @@ class CFileItem(popuplist.CListItem):
     
     @property
     def displayText(self):
-        if self.owner.optShowAttrs: return u"%s   %s" % (self.attrs, self._text)
+        if self.owner._attributesVisible: return u"%s   %s" % (self.attrs, self._text)
         return u"  %s" % self._text
 
 class CDirectoryItem(popuplist.CListItem):
@@ -33,7 +33,7 @@ class CDirectoryItem(popuplist.CListItem):
     
     @property
     def displayText(self):
-        if self.owner.optShowAttrs: return u"%s + %s" % (self.attrs, self._text)
+        if self.owner._attributesVisible: return u"%s + %s" % (self.attrs, self._text)
         return u"+ %s" % self._text
 
 class CFileBrowser(popuplist.CList):
@@ -45,10 +45,12 @@ class CFileBrowser(popuplist.CList):
         self.titleAlign = ">"
         self.minSize = (32, 8)
         self.osencoding = "utf-8" # TODO: get file-system encoding
-        self.filterHide = "*.pyc,*.o,*.*~,.*.swp"
+        self.filterHide = "*.pyc,*.o,*.*~,.*.swp" # TODO: user-editable
         self._masks_hide = None
         self.optShowAttrs = True
         self.exprRecentDirList = "g:VXRECENTDIRS"
+        self.callbackEditFile = ""
+        self.subdirDepth = 0
 
     @property
     def _hideFilterMasks(self):
@@ -61,6 +63,10 @@ class CFileBrowser(popuplist.CList):
                     self._masks_hide.append(mask)
                 except: pass
         return self._masks_hide
+
+    @property
+    def _attributesVisible(self):
+        return self.optShowAttrs and self.subdirDepth == 0
 
     def _isHidden(self, fname):
         for mask in self._hideFilterMasks:
@@ -108,6 +114,38 @@ class CFileBrowser(popuplist.CList):
             else: pass
         return dirs, files
 
+    def onFilterChanged(self, old, new):
+        if self.subdirDepth < 1: return
+        # when displaying subdirs, we add only matching items
+        self.loadDirectory(self.currentPath)
+        self.relayout()
+
+    # TODO: change listtree from DFS to BFS
+    # listtree: add only the items that match self.strFilter
+    def listtree(self, path, root=None, depth=0, count=0):
+        files = []
+        if root == None: root = path
+        filt = self.strFilter.lower()
+        for f in os.listdir(path):
+            pathname = os.path.join(path, f)
+            try:
+                fst = os.stat(pathname)
+                mode = fst.st_mode
+            except: continue
+            if self._isHidden(f): continue
+            fname = os.path.relpath(pathname, root)
+            fname = fname.decode(self.osencoding, "replace")
+            if stat.S_ISDIR(mode):
+                if fname.lower().find(filt) >= 0:
+                    files.append([fname, CDirectoryItem(self, fname)])
+                if depth > 0 and count+len(files) < 1000: # TODO: user configurable limit on # of files
+                    files = files + self.listtree(pathname, root, depth-1, count + len(files))
+            elif stat.S_ISREG(mode):
+                if fname.lower().find(filt) >= 0:
+                    files.append([fname, CFileItem(self, fname)])
+            else: pass
+        return files
+
     def getExtraPrompt(self, maxwidth=30):
         # TODO: User configurable path replacements, like
         #     "HOME" = "/home/user"; "DOC" = "/home/user/Documents"
@@ -117,26 +155,36 @@ class CFileBrowser(popuplist.CList):
     def loadDirectory(self, path):
         path = os.path.abspath(path)
         self.currentPath = path
-        dirs, files = self.listdir(path)
-        dirs.sort()
-        files.sort()
         self.allitems = [CDirectoryItem(self, u"..", " " * 25)]
-        for fn in dirs: self.allitems.append(fn[1])
-        for fn in files: self.allitems.append(fn[1])
         self.title = self.currentPath
+        if self.subdirDepth < 1:
+            dirs, files = self.listdir(path)
+            dirs.sort()
+            files.sort()
+            for fn in dirs: self.allitems.append(fn[1])
+            for fn in files: self.allitems.append(fn[1])
+        else:
+            files = self.listtree(path, path, self.subdirDepth)
+            files.sort()
+            for fn in files: self.allitems.append(fn[1])
         self.refreshDisplay()
 
     def modifyKeymaps(self):
         # override CList commands; handle them in doListCommand
         for km in [self.keymapNorm]:
-            km.setKey("\<CR>", "list:dired-select")
+            km.setKey(r"\<CR>", "list:dired-select")
             # km.setKey("\<LeftMouse>", "list:dired-select") # TODO: double click
-            km.setKey("\<BS>", "list:dired-goback")
-            km.setKey("\<RightMouse>", "list:dired-goback")
-            km.setKey("d", "list:dired-recentdir") # TODO: shortcut
-            km.setKey("a", "list:dired-attributes")
-            # TODO: attribute shortcuts: on/off aa-toggle; sort
-            # by name, ext, size, time (an ae as at - toggle direction)
+            km.setKey(r"\<BS>", "list:dired-goback")
+            km.setKey(r"\<RightMouse>", "list:dired-goback")
+            km.setKey(r"d", "list:dired-recentdir") # TODO: shortcut
+            km.setKey(r"oa", "list:dired-attributes")
+            # TODO: attribute shortcuts: sort by name, ext, size, time (on oe os ot; toggle direction)
+            km.setKey(r"+", "list:dired-subdirmore")
+            km.setKey(r"-", "list:dired-subdirless")
+        for km in [self.keymapNorm, self.keymapFilter]:
+            km.setKey(r"\<c-l>", "list:dired-subdirmore")
+            km.setKey(r"\<c-h>", "list:dired-subdirless")
+            km.setKey(r"\<c-k>", "list:dired-subdirnone")
         self.quickCharAutoSelect = ""
         self.keymapFilter.setKey("\<CR>", "list:dired-filter-select")
         # TODO: add + to show one sublevel more, - to show one sublevel less
@@ -154,45 +202,88 @@ class CFileBrowser(popuplist.CList):
                     self.setCurIndex(i)
                     break
 
+    def _diredRecentDir(self):
+        dirs = vim.eval(self.exprRecentDirList)
+        dirs = dirs.strip()
+        if dirs == "": return ""
+        dirs = (u"%s" % dirs).split("\n")
+        def _chdir(i):
+            newdir = dirs[i]
+            if newdir == self.currentPath: return
+            self.loadDirectory(newdir)
+            # self.setFilter("")
+            self.relayout()
+            self.setCurIndex(0)
+        List = popuplist.CList(title="Recent directories") # , autosize="VH", align="B")
+        List.loadUnicodeItems(dirs)
+        List.cmdAccept = _chdir
+        List.process(curindex=0)
+        List=None
+        self.redraw()
+        return ""
+
+    def _diredSelect(self, cmd, parms, curindex):
+        i = self.getTrueIndex(curindex)
+        selitem = self.allitems[i]
+        if selitem._ftype == 'd':
+            self.cd(selitem._text)
+            if cmd == "dired-filter-select": return "filter-restart"
+            return ""
+        fn = os.path.join(self.currentPath, selitem._text)
+        vimenc = vim.eval("&encoding")
+        if self.callbackEditFile == None or self.callbackEditFile == "":
+            fn = fn.replace(" ", "\\ ")
+            cmd = u"edit %s" % fn
+            cmd = cmd.encode(vimenc)
+            vim.command(cmd)
+            return "quit"
+        else:
+            vimpar = ",".join(["'%s'" % p for p in parms])
+            if vimpar == "": vimpar = "''"
+            expr = self.callbackEditFile # TODO: check string encoding!
+            expr = expr.replace("{{s}}", "'%s'" % fn)
+            expr = expr.replace("{{p}}", vimpar)
+            try:
+                rv = vim.eval(expr)
+                if rv == "q": return "quit"
+            except: pass
+        return ""
+
+    # cmd exception: the command can have parameters
     def doListCommand(self, cmd, curindex):
+        cmd = cmd.split()
+        parms = cmd[1:]
+        cmd = cmd[0]
         if cmd == "dired-goback": self.cd("..")
         elif cmd == "dired-select" or cmd == "dired-filter-select":
-            i = self.getTrueIndex(curindex)
-            selitem = self.allitems[i]
-            if selitem._ftype == 'd':
-                self.cd(selitem._text)
-                if cmd == "dired-filter-select": return "filter-restart"
-            else:
-                fn = os.path.join(self.currentPath, selitem._text)
-                fn = fn.replace(" ", "\\ ")
-                cmd = u"edit %s" % fn
-                cmd = cmd.encode(vim.eval("&encoding"))
-                vim.command(cmd)
-                return "quit"
+            return self._diredSelect(cmd, parms, curindex)
         elif cmd == "dired-recentdir": # This will not work with wx
-            dirs = vim.eval(self.exprRecentDirList)
-            dirs = dirs.strip()
-            if dirs != "":
-                dirs = (u"%s" % dirs).split("\n")
-                def _chdir(i):
-                    newdir = dirs[i]
-                    if newdir == self.currentPath: return
-                    self.loadDirectory(newdir)
-                    # self.setFilter("")
-                    self.relayout()
-                    self.setCurIndex(0)
-                List = popuplist.CList(title="Recent directories", autosize="VH", align="B")
-                List.loadUnicodeItems(dirs)
-                List.cmdAccept = _chdir
-                List.process(curindex=0)
-                List=None
-                self.redraw()
+            return self._diredRecentDir()
         elif cmd == "dired-attributes":
             self.optShowAttrs = not self.optShowAttrs
             self.relayout()
+        elif cmd == "dired-subdirmore":
+            self.subdirDepth += 1
+            self.loadDirectory(self.currentPath)
+            self.relayout()
+        elif cmd == "dired-subdirless":
+            self.subdirDepth -= 1
+            if self.subdirDepth < 0: self.subdirDepth = 0
+            self.loadDirectory(self.currentPath)
+            self.relayout()
+        elif cmd == "dired-subdirnone":
+            self.subdirDepth = 0
+            self.loadDirectory(self.currentPath)
+            self.relayout()
         else: return popuplist.CList.doListCommand(self, cmd, curindex)
+        return ""
 
-    def process(self, curindex=0):
-        self.loadDirectory(os.getcwd())
+    def process(self, curindex=0, cwd=None):
+        if cwd == None: cwd = os.getcwd()
+        else:
+            if not os.path.exists(cwd): cwd = os.getcwd()
+            fst = os.stat(cwd)
+            if not stat.S_ISDIR(fst.st_mode): cwd = os.getcwd()
+        self.loadDirectory(cwd)
         popuplist.CList.process(self, curindex, startmode=1) # TODO: startmode=sth.NORMAL
 
