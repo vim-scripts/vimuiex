@@ -87,6 +87,7 @@ class CList(object):
         self.maxColumnWidth = 0.3
         self.allitems = []
         self.strFilter = "" 
+        self.filterWordSeparator = ","
         self.__items = None     # Displayed (filtered) items; delayed creation in items()
         self.__listbox = None   # Listbox implementation
         self.sort = True        # sort input list
@@ -247,17 +248,44 @@ class CList(object):
         if self.__items == None: self.__applyFilter()
         return len(self.__items)
 
+    # returns a list of tuples: (word, negated?)
+    def getFilterWords(self):
+        if self.filterWordSeparator == "": sep = " "
+        else: sep = self.filterWordSeparator
+        filt = self.strFilter.lower().split(sep)
+        filt = [ f.strip() for f in filt if f.strip() != "" ]
+        filt = [ (f.lstrip("-"), f.startswith("-")) for f in filt if f.lstrip("-") != ""]
+        return filt
+
+    # @param words a list of tuples: (word, negated?)
+    # @returns a tuple (trueIfAllMatched, positiveMatchPosition)
+    def matchFilterWords(self, text, words, startat=0):
+        good = True; bestpos = -1
+        for f in words:
+            pos = text.find(f[0], startat)
+            if (pos >= 0 and f[1]) or (pos < 0 and not f[1]):
+                good = False
+                break
+            if bestpos < 0 and not f[1] and pos >= 0: bestpos = pos
+        return (good, bestpos)
+
     def __applyFilter(self):
+        addAll = False
         if self.strFilter == None or self.strFilter == "":
-            self.__items = [i for i in self.allitems]
+            addAll = True
         else:
-            filt = self.strFilter.lower()
+            filt = self.getFilterWords()
+            if len(filt) < 1: addAll = True
+
+        if addAll: self.__items = [i for i in self.allitems]
+        else:
             startat = 0
             inhead=[]; intail=[]
             for i in self.allitems:
-                pos = i.filterText.lower().find(filt, startat)
-                if pos < 0: continue
-                elif pos == startat and self.filtersort: inhead.append(i)
+                text = i.filterText.lower()
+                good, bestpos = self.matchFilterWords(text, filt, startat)
+                if not good: continue
+                elif bestpos == startat and self.filtersort: inhead.append(i)
                 else: intail.append(i)
             self.__items = inhead + intail
         pass

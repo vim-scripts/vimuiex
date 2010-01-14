@@ -125,7 +125,9 @@ function! vxlib#cmd#EditLine(filename, line, column, ...)
    call setpos('.', [0, a:line, a:column, 0])
    " Unfold and center
    if v:foldlevel > 0 && match(zflags, 'O') >= 0
-      norm zO
+      try | norm zO
+      catch /E490/ " No fold found
+      endtry
    endif
    if match(zflags, 'z') >= 0
       norm zz

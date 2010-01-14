@@ -63,17 +63,14 @@ exec 'python VIM_SNR_VXRECENTFILES="<SNR>' . s:SID .'"'
 python << EOF
 import vim
 import vimuiex.popuplist as lister
-# TODO: VxOpenRecentFile: align first column
 List = lister.CList(title="Recent files", optid="VxOpenRecentFile")
 List.loadVimItems("%sGetRecentFiles()" % VIM_SNR_VXRECENTFILES)
 List.cmdAccept = "%sSelectMarkedFiles_cb({{M}}, {{i}}, '')" % VIM_SNR_VXRECENTFILES
 List.keymapNorm.setKey(r"\<s-cr>", "vim:%sSelectMarkedFiles_cb({{M}}, {{i}}, 't')" % VIM_SNR_VXRECENTFILES)
-# x-"execute" 
 List.keymapNorm.setKey(r"gs", "vim:%sSelectMarkedFiles_cb({{M}}, {{i}}, 's')" % VIM_SNR_VXRECENTFILES)
 List.keymapNorm.setKey(r"gv", "vim:%sSelectMarkedFiles_cb({{M}}, {{i}}, 'v')" % VIM_SNR_VXRECENTFILES)
 List.keymapNorm.setKey(r"gt", "vim:%sSelectMarkedFiles_cb({{M}}, {{i}}, 't')" % VIM_SNR_VXRECENTFILES)
 List._firstColumnAlign = True
-# TODO: s - split, v - vsplit
 List.process(curindex=0)
 List=None
 EOF

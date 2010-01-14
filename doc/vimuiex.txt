@@ -1,9 +1,10 @@
 *vimuiex.txt*        User Interface Extensions      Last Change: November 2009
 
 User Interface Extensions (Experiment)
-		       Version 0.6
+Version 0.6
 
-  Description                     |vimuiex|	      
+ *vimuiex*
+  Description                     |vimuiex-description|
   Default popup list operation    |vimuiex-operation|   
   Plugins                         |vimuiex-plugins|     
   Python library usage            |vimuiex-pythonlib|   
@@ -14,7 +15,7 @@ For Vim version 7.2 and above.
 Requires python interface. A patch is required for GVim.
 
 ==============================================================================
-DESCRIPTION					*vimuiex*
+DESCRIPTION					*vimuiex-description*
 
 Vimuiex is a library and a set of plugins for the Vim text editor. It adds a 
 popup listbox that is displayed in an overlapping window. The list can be 
@@ -62,6 +63,12 @@ string elsewhere. In filtering mode the following keys can be used:
    <Esc>	     clear the filter and exit filtering mode
    <CR>		     exit filtering mode and keep the filter string
    <BS>		     remove the last character from the filter string
+   <tab>             exit filtering mode and move to next item
+   <s-tab>           exit filtering mode and move to previous item
+
+Multiple search terms can be entered in the filter, separated by ','. A term
+that begins with '-' will succeed on items that don't contain the term. The
+filter selects an item if all terms succeed for that item.
 
 (TODO: new keys can be added to the popup list keymap)
 

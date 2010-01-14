@@ -125,7 +125,7 @@ class CFileBrowser(popuplist.CList):
     def listtree(self, path, root=None, depth=0, count=0):
         files = []
         if root == None: root = path
-        filt = self.strFilter.lower()
+        filt = self.getFilterWords()
         for f in os.listdir(path):
             pathname = os.path.join(path, f)
             try:
@@ -136,13 +136,13 @@ class CFileBrowser(popuplist.CList):
             fname = os.path.relpath(pathname, root)
             fname = fname.decode(self.osencoding, "replace")
             if stat.S_ISDIR(mode):
-                if fname.lower().find(filt) >= 0:
-                    files.append([fname, CDirectoryItem(self, fname)])
+                good, pos = self.matchFilterWords(fname.lower(), filt)
+                if good: files.append([fname, CDirectoryItem(self, fname)])
                 if depth > 0 and count+len(files) < 1000: # TODO: user configurable limit on # of files
                     files = files + self.listtree(pathname, root, depth-1, count + len(files))
             elif stat.S_ISREG(mode):
-                if fname.lower().find(filt) >= 0:
-                    files.append([fname, CFileItem(self, fname)])
+                good, pos = self.matchFilterWords(fname.lower(), filt)
+                if good: files.append([fname, CFileItem(self, fname)])
             else: pass
         return files
 

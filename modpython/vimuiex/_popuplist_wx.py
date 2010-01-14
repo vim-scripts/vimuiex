@@ -14,7 +14,7 @@ import re
 import vim
 import ioutil.gwx
 import simplekeymap
-import platform
+# import platform
 
 def log(msg):
     f = open ("testlog.txt", "a")
@@ -288,6 +288,6 @@ class CPopupListbox:
 
 # Factory
 def createListboxView(position, size):
-    if platform.PLATFORM == "wx":
+    if ioutil.PLATFORM == "wx":
         return CPopupListbox(position, size)
     return None
