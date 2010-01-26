@@ -9,6 +9,14 @@ if vxlib#plugin#StopLoading('#au#vxlib#cmd')
    finish
 endif
 
+" use in script that needs SID with: exec vxlib#cmd#MakeSID()
+function! vxlib#cmd#MakeSID()
+   let sid_script = "map <SID>xx <SID>xx\n" .
+      \ "let s:SID = substitute(maparg('<SID>xx'), '<SNR>\\(\\d\\+_\\)xx$', '\\1', '') \n" .
+      \ "unmap <SID>xx"
+   return sid_script
+endfunc
+
 function! vxlib#cmd#CaptureShell(aCommand)
    let capture = []
    try
@@ -168,14 +176,17 @@ function! vxlib#cmd#PreviewLine(filenameOrBufnr, line)
 endfunc
 
 function! vxlib#cmd#ShowQFixPreview()  
-   let lnn = line('.')
-   let pos = getqflist()[lnn-1]
-   call vxlib#cmd#PreviewLine(pos['bufnr'], pos['lnum'])
+   let idqf = line('.') - 1
+   let pos = getqflist()[idqf]
+   call vxlib#cmd#PreviewLine(pos.bufnr, pos.lnum)
 endfunc
 
 function! vxlib#cmd#PrepareQFixPreview()
-   nmap <silent> <Space> :call vxlib#cmd#ShowQFixPreview()<CR>
-   nnoremap <silent> <CR> :pclose<CR><CR>
+   nnoremap <buffer><silent> <Space> :call vxlib#cmd#ShowQFixPreview()<CR>
+   nnoremap <buffer><silent> p :call vxlib#cmd#ShowQFixPreview()<CR>
+   nnoremap <buffer><silent> P :pclose<CR>
+   nnoremap <buffer><silent> <CR> :pclose<CR><CR>
+   " TODO: How to choose between cclose ande lclose? nnoremap <silent> <c-CR> :pclose<CR><CR>:cclose<CR>
 endfunc
 
 " =========================================================================== 

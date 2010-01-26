@@ -10,6 +10,15 @@ if exists('s:vxlib_plugin_loaded')
 endif
 let s:vxlib_plugin_loaded = 1
 
+" use in script that needs SID with: exec vxlib#plugin#MakeSID()
+function! vxlib#plugin#MakeSID()
+   let sid_script = "map <SID>xx <SID>xx\n" .
+      \ "let s:SID = substitute(maparg('<SID>xx'), '<SNR>\\(\\d\\+_\\)xx$', '\\1', '') \n" .
+      \ "unmap <SID>xx\n" .
+      \ "let s:SNR = '<SNR>' . s:SID"
+   return sid_script
+endfunc
+
 " Check if the variable 'name' exists. Create it with the value 'default' if
 " it doesn't.
 " @param name - string, the name of the global variable ("g:...")
@@ -110,7 +119,7 @@ function! vxlib#plugin#List()
       else
          if state == -1 | call add(disabled, k)
          elseif state == -2 | call add(missing, k)
-         else | call add(errors. k)
+         else | call add(errors, k)
          endif
       endif
    endfor
@@ -139,6 +148,13 @@ function! vxlib#plugin#List()
    if len(enabled) > 0 | echo 'Plugins explicitly enabled/disabled:'
       for k in enabled
          echo '   ' . g:VxPlugins[k] . ' ' . k
+      endfor
+   endif
+   let errors = keys(g:VxPluginErrors)
+   call sort(errors)
+   if len(errors) > 0 | echo 'Reported errors:'
+      for k in errors
+         echo '   ' . g:VxPluginErrors[k] . ' ' . k
       endfor
    endif
 

@@ -7,7 +7,7 @@
 # License: GPL (http://www.gnu.org/copyleft/gpl.html)
 # This program comes with ABSOLUTELY NO WARRANTY.
 
-import time
+import re, time
 import vim
 import simplekeymap
 import ioutil
@@ -56,6 +56,10 @@ class CListItem(object):
     def filterText(self):
         return self._text
 
+    @property
+    def callbackText(self):
+        return self._text
+
 # TODO: add incremental search: works like filter, but lines are not hidden;
 #       TAB moves to next occurence; needed eg. with VxMan;
 # TODO: add default search mode for /: i-search or filter
@@ -99,7 +103,9 @@ class CList(object):
         self.quickCharAutoSelect = "accept" # An item with a unique quick char will be auto-"accept"-ed; TODO: make it nicer
         self.cmdCancel = "" # 'echo "canceled"'
         self.cmdAccept = "" # 'echo "accepted {{i}}"'
+        self.prompt = None # TODO: document special format; see _popuplist_screen..._buildPrompt
         self.initKeymaps()
+
 
     def getTitle(self, maxwidth):
         if len(self.title) < maxwidth: return self.title
@@ -187,9 +193,9 @@ class CList(object):
             cmd = ""
         elif cmd.startswith("vim:"):
             cmd = self.doVimCallback(cmd[4:].strip(), curindex)
-            vim.command("redraw!")
-            self.redraw()
-            # cmd = ""
+            if cmd != "quit":
+                vim.command("redraw!")
+                self.redraw()
         return cmd
 
     def doWinposCmd(self, cmd):
@@ -211,7 +217,9 @@ class CList(object):
             cmd = self.expandVimCommand(cmd, curindex)
             rv = vim.eval(cmd)
             if rv == "q": return "quit"
-        except: pass
+        except Exception as e:
+            vim.command("echom 'doVimCallback: %s'" % e)
+            pass
         return ""
 
     def redraw(self):
@@ -300,7 +308,9 @@ class CList(object):
 
     def loadVimItems(self, vimvar):
         encoding = vim.eval("&encoding")
-        self.allitems = [CListItem(line.decode(encoding)) for line in vim.eval(vimvar)]
+        self.allitems = [
+            CListItem(line.decode(encoding) if line != None else "")
+            for line in vim.eval(vimvar)]
         self.refreshDisplay()
 
     def loadUnicodeItems(self, pylist):
@@ -319,13 +329,38 @@ class CList(object):
         else: i = self.allitems.index(self.__items[filteredIndex])
         return i
 
-    def expandVimCommand(self, command, curindex):
-        i = self.getTrueIndex(curindex)
-        cmd = command.replace("{{i}}", "%d" % (i))
-        if command.find("{{M}}") > 0:
-            marks = ",".join(["%d" % (i) for i,item in enumerate(self.allitems) if item.marked])
-            cmd = cmd.replace("{{M}}", "[" + marks + "]")
-        return cmd
+    # @param extraParamHandlers can be used to define additional parameters to be expanded.
+    #        A dictionary of pairs "{{param}}": handler, where handler is a function defined
+    #        as: handler(theList, allItems, curItem) that returns a string (a vim function
+    #        parameter or a list of vim function parameters)
+    #        Example: @see dired CFileBrowser.expandVimCommand, CFileBrowser._diredSelect
+    def expandVimCommand(self, command, curindex, extraParamHandlers={}):
+        icur = self.getTrueIndex(curindex)
+        rxp = re.compile(r"(\{\{[a-zA-Z0-9]+\}\})")
+        parts = rxp.split(command)
+        if len(parts) == 1: return command
+        newcmd = [parts[0]]
+        for p in parts[1:]:
+            if not p.startswith("{{"):
+                newcmd.append(p)
+                continue
+            if p == "{{i}}": p = "%d" % (icur)
+            elif p == "{{M}}":
+                marks = ",".join(["%d" % (i) for i,item in enumerate(self.allitems) if item.marked])
+                p = "[" + marks + "]"
+            elif p == "{{s}}": p = "'%s'" % self.allitems[icur].callbackText # TODO: escape string!
+            elif p == "{{S}}":
+                marks = ",".join(
+                    ["'%s'" % item.callbackText # TODO: escape string!
+                    for item in self.allitems if item.marked])
+                p = "[" + marks + "]"
+            else:
+                for k,fnHandler in extraParamHandlers.iteritems():
+                    if k == p:
+                        p = fnHandler(self, self.allitems, self.allitems[icur])
+                        break
+            newcmd.append(p)
+        return "".join(newcmd)
     
     def calcFirstColumnWidth(self, textwidth, items):
         mwf = self.maxColumnWidth

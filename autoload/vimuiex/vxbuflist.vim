@@ -17,9 +17,7 @@ endif
 " Local Initialization - on autoload
 " =========================================================================== 
 call vxlib#python#prepare()
-map <SID>xx <SID>xx
-let s:SID = substitute(maparg('<SID>xx'), '<SNR>\(\d\+_\)xx$', '\1', '')
-unmap <SID>xx
+exec vxlib#plugin#MakeSID()
 let s:bufnumbers = []
 let g:_VxPopupListPosDefault['VxBufListSelect'] = 'minsize=0.4,8'
 " =========================================================================== 
@@ -126,11 +124,11 @@ function! s:ToggleUnlisted_cb()
 endfunc
 
 function! s:ReloadBufferList()
-   python BufList.loadVimItems('%sGetBufferList()' % VIM_SNR_VXBUFLIST)
+   exec 'python BufList.loadVimItems("' . s:SNR . 'GetBufferList()")'
 endfunc
 
 function! vimuiex#vxbuflist#VxBufListSelect()
-   exec 'python VIM_SNR_VXBUFLIST="<SNR>' . s:SID .'"'
+   exec 'python def SNR(s): return s.replace("$SNR$", "' . s:SNR . '")'
 
 python << EOF
 import vim
@@ -140,19 +138,19 @@ BufList._firstColumnAlign = True
 EOF
    exec 'python BufList.title="' . s:GetTitle() . '"'
 python << EOF
-BufList.loadVimItems("%sGetBufferList()" % VIM_SNR_VXBUFLIST)
-BufList.cmdAccept = "%sSelectBuffer_cb({{i}}, '')" % VIM_SNR_VXBUFLIST
-BufList.keymapNorm.setKey(r"\<s-cr>", "vim:%sSelectBuffer_cb({{i}}, 't')" % VIM_SNR_VXBUFLIST)
+BufList.loadVimItems(SNR("$SNR$GetBufferList()"))
+BufList.cmdAccept = SNR("$SNR$SelectBuffer_cb({{i}}, '')")
+BufList.keymapNorm.setKey(r"\<s-cr>", SNR("vim:$SNR$SelectBuffer_cb({{i}}, 't')"))
 # x-"execute" 
-BufList.keymapNorm.setKey(r"xd", "vim:%sRemoveBuffer_cb({{i}}, 'bdelete')" % VIM_SNR_VXBUFLIST)
-BufList.keymapNorm.setKey(r"xw", "vim:%sRemoveBuffer_cb({{i}}, 'bwipeout')" % VIM_SNR_VXBUFLIST)
+BufList.keymapNorm.setKey(r"xd", SNR("vim:$SNR$RemoveBuffer_cb({{i}}, 'bdelete')"))
+BufList.keymapNorm.setKey(r"xw", SNR("vim:$SNR$RemoveBuffer_cb({{i}}, 'bwipeout')"))
 # g-"goto" 
-BufList.keymapNorm.setKey(r"gs", "vim:%sSelectMarkedBuffers_cb({{M}}, {{i}}, 's')" % VIM_SNR_VXBUFLIST)
-BufList.keymapNorm.setKey(r"gv", "vim:%sSelectMarkedBuffers_cb({{M}}, {{i}}, 'v')" % VIM_SNR_VXBUFLIST)
-BufList.keymapNorm.setKey(r"gt", "vim:%sSelectBuffer_cb({{i}}, 't')" % VIM_SNR_VXBUFLIST)
+BufList.keymapNorm.setKey(r"gs", SNR("vim:$SNR$SelectMarkedBuffers_cb({{M}}, {{i}}, 's')"))
+BufList.keymapNorm.setKey(r"gv", SNR("vim:$SNR$SelectMarkedBuffers_cb({{M}}, {{i}}, 'v')"))
+BufList.keymapNorm.setKey(r"gt", SNR("vim:$SNR$SelectBuffer_cb({{i}}, 't')"))
 # o-"option"
-BufList.keymapNorm.setKey(r"ou", "vim:%sToggleUnlisted_cb()" % VIM_SNR_VXBUFLIST)
-BufList.keymapNorm.setKey(r"os", "vim:%sResortItems_cb()" % VIM_SNR_VXBUFLIST)
+BufList.keymapNorm.setKey(r"ou", SNR("vim:$SNR$ToggleUnlisted_cb()"))
+BufList.keymapNorm.setKey(r"os", SNR("vim:$SNR$ResortItems_cb()"))
 BufList.process(curindex=1)
 BufList=None
 EOF

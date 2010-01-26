@@ -15,6 +15,7 @@ plugin directory. The rest of the plugin code is autoloaded when it is
 actually used for the first time.
 
 The Anatomy of a plugin                                *vxlib-plugin-example*
+-----------------------
 
 Example plugin (Hello "user"):
 >
@@ -177,13 +178,17 @@ Example plugin (Hello "user"):
    present even if the block doesn't contain any commands. If the startup code 
    isn't needed, the startup block should not be present.
 
+
 How to Enable plugins in .vimrc			      *vxlib-plugin-enable*
+-------------------------------
 
    Initially all the plugins are enabled by default. To disable an undesired 
    plugin you can write 
 >
     vxlib#plugin#Init()
     let g:VxPlugin["test#hello"] = 0
+  or
+    VxLet VxPlugin test#hello 0
 <
    The function vxlib#plugin#Init() is only used to autoload the vxlib#plugin 
    module that creates g:VxPlugin if it doesn't exist.
@@ -196,31 +201,34 @@ How to Enable plugins in .vimrc			      *vxlib-plugin-enable*
    and then for each plugin that you want to use
 >
     let g:VxPlugin["test#hello"] = 1
+  or
+    VxLet VxPlugin test#hello 1
 <
 
 Plugin Code Generator				      *vxlib-plugin-generator*
+---------------------
 
-   Plugin Code Generator is an external python script that parses .vim 
-   files specified in the command line and searches for the tag "VIMPLUGIN".
-   It extracts the code and generates plugin activation code for each
-   VIMPLUGIN block. The generated code is written to standard output.
+The Plugin Code Generator is an standalone python script that parses .vim
+files specified in the command line and searches for the tag "VIMPLUGIN". It
+extracts the code and generates plugin activation code for each VIMPLUGIN
+block. The generated code is written to standard output.
 
-   Invocation:
+Example:
 >
-    cd ~/.vim/autoload
-    python vxlib/plugin.py ./vimuiex > ../plugin/_vimuiex_au_.vim
+   cd ~/.vim/autoload
+   python vxlib/plugin.py . > ../plugin/_vimuiex_au_.vim
 <
-   The code generated for a plugin will look like this:
+The code generated for a plugin will look like this:
 >
-    if vxlib#plugin#ContinueLoading("test#hello")
-     if ! (has("python")&&has("gui_running"))
-      call s:SetLoaded("test#helo", -2)
-      let g:VxPluginMissFeatures["test#helo"] = "python&&gui_running: " .
-	 \ s:StrHas("gui_running,python")
-     else
-       " code 12-19
-     endif
+   if vxlib#plugin#ContinueLoading("test#hello")
+    if ! (has("python")&&has("gui_running"))
+     call s:SetLoaded("test#helo", -2)
+     let g:VxPluginMissFeatures["test#helo"] = "python&&gui_running: " .
+        \ s:StrHas("gui_running,python")
+    else
+      " code 12-19
     endif
+   endif
 <
 
 

@@ -188,9 +188,7 @@ class CPopupListbox(object):
         #    if ord(ch) < 32: nl = nl + " "
         #    else: nl = nl + ch
         #line = nl
-
-        # FIXME: outputEncoding: double-width characters will break the display
-        return line.encode(self.outputEncoding, "replace") # unknown chars replaced with ?
+        return line
 
     def drawItems(self):
         y = 0
@@ -204,8 +202,10 @@ class CPopupListbox(object):
         for i in xrange(top, self.itemCount):
             y = i - top
             if y > self.lastline: break
+            uline = self.getLineStr(items[i].displayText, y)
+            # FIXME: outputEncoding: double-width characters will break the display
+            line = uline.encode(self.outputEncoding, "replace") # unknown chars replaced with ?
             marked = items[i].marked
-            line = self.getLineStr(items[i].displayText, y)
             if i == self.curindex and marked: co = self.coSelMarked
             elif i == self.curindex: co = self.coSelected
             elif marked: co = self.coMarked
@@ -215,9 +215,9 @@ class CPopupListbox(object):
             # win.addstr(y, 0, line, co) # combination with scrollok(False) - failed in curses
             if hasQuick and items[i].quickchar != None:
                 # pos = items[i].quickCharPos
-                pos = line.lower().find(items[i].quickchar)
+                pos = uline.lower().find(items[i].quickchar)
                 if pos >= 0 and pos < self.textwidth - 1:
-                    ch = line[pos]
+                    ch = uline[pos].encode(self.outputEncoding, "replace")
                     win.addstr(y, pos, ch, self.coHilight)
             if hasNumSelect:
                 win.addstr(y, 0, self.numselect.format % y, self.coHilight)
@@ -357,16 +357,28 @@ class CPopupListbox(object):
                 # TODO: Redraw only current item on togglemarked
         pass
 
+    # if CList.prompt starts with \r, process further, oterwise return unprocessed
+    # processing:
+    #    replace {{mode}} with current lb keyborard mode
+    #    replace {{extra}} with itemlist.getExtraPrompt
     def _buildPrompt(self):
-        if self.keyboardMode == CPopupListbox.NORMAL: p2 = ""
-        elif self.keyboardMode == CPopupListbox.FILTER: p2 = ".Filter"
-        elif self.keyboardMode == CPopupListbox.QUICK: p2 = ".QuickChar"
-        elif self.keyboardMode == CPopupListbox.NUMSELECT: p2 = ".NumSelect"
+        prompt = self.itemlist.prompt
+        if prompt == None: prompt = "\rPopup List{{mode}}>>>{{extra}}"
+        if not prompt.startswith("\r"): return prompt
+        prompt = prompt.lstrip()
+        if prompt.find("{{") < 0: return prompt
+        mode = self.keyboardMode
+        if mode == CPopupListbox.NORMAL: p2 = ""
+        elif mode == CPopupListbox.FILTER: p2 = ".Filter"
+        elif mode == CPopupListbox.QUICK: p2 = ".QuickChar"
+        elif mode == CPopupListbox.NUMSELECT: p2 = ".NumSelect"
         else: p2 = ""
-        p1 = "Popup List%s >>>" % p2
-        mw = int(vim.eval("&columns")) - 2 - len(p1)
-        p3 = self.itemlist.getExtraPrompt(mw)
-        return "%s%*s " % (p1, -mw, p3)
+        prompt = prompt.replace("{{mode}}", p2)
+        mw = int(vim.eval("&columns")) - 2 - len(prompt)
+        if prompt.find("{{extra}}") >= 0:
+            p3 = self.itemlist.getExtraPrompt(mw)[:mw] if mw > 0 else ""
+            prompt = prompt.replace("{{extra}}", p3)
+        return prompt
 
     def _vim_getkey(self):
         ioutil.CScreen().showPrompt(self._buildPrompt())
@@ -494,7 +506,15 @@ class CPopupListbox(object):
         return self.exitcommand
 
 class CPopupListboxScreen(CPopupListbox):
+    colorSchemeChecked = "--"
     def initPlatform(self):
+        try: cs = vim.eval("exists('g:colors_name') ? g:colors_name : ('*bg*' . &background)")
+        except vim.error: cs="--"
+        if cs != CPopupListboxScreen.colorSchemeChecked:
+            try: vim.eval("vimuiex#vxlist#CheckHilightItems()")
+            except vim.error: pass
+            CPopupListboxScreen.colorSchemeChecked = cs
+
         # TODO: create user setting in vim for outputEncoding
         self.outputEncoding = vim.eval("&encoding")
         try:

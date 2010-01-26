@@ -16,9 +16,7 @@ endif
 " Local Initialization - on autoload
 " =========================================================================== 
 call vxlib#python#prepare()
-map <SID>xx <SID>xx
-let s:SID = substitute(maparg('<SID>xx'), '<SNR>\(\d\+_\)xx$', '\1', '')
-unmap <SID>xx
+exec vxlib#plugin#MakeSID()
 " =========================================================================== 
 
 " -------------------------------------------------------
@@ -58,23 +56,18 @@ function! s:SelectMarkedFiles_cb(marked, index, winmode)
 endfunc
 
 function! vimuiex#vxrecentfile#VxOpenRecentFile()
-exec 'python VIM_SNR_VXRECENTFILES="<SNR>' . s:SID .'"'
-
-python << EOF
-import vim
-import vimuiex.popuplist as lister
-List = lister.CList(title="Recent files", optid="VxOpenRecentFile")
-List.loadVimItems("%sGetRecentFiles()" % VIM_SNR_VXRECENTFILES)
-List.cmdAccept = "%sSelectMarkedFiles_cb({{M}}, {{i}}, '')" % VIM_SNR_VXRECENTFILES
-List.keymapNorm.setKey(r"\<s-cr>", "vim:%sSelectMarkedFiles_cb({{M}}, {{i}}, 't')" % VIM_SNR_VXRECENTFILES)
-List.keymapNorm.setKey(r"gs", "vim:%sSelectMarkedFiles_cb({{M}}, {{i}}, 's')" % VIM_SNR_VXRECENTFILES)
-List.keymapNorm.setKey(r"gv", "vim:%sSelectMarkedFiles_cb({{M}}, {{i}}, 'v')" % VIM_SNR_VXRECENTFILES)
-List.keymapNorm.setKey(r"gt", "vim:%sSelectMarkedFiles_cb({{M}}, {{i}}, 't')" % VIM_SNR_VXRECENTFILES)
-List._firstColumnAlign = True
-List.process(curindex=0)
-List=None
-EOF
-
+   call vimuiex#vxlist#VxPopup(s:GetRecentFiles(), 'Recent files', {
+      \ 'optid': 'VxOpenRecentFile',
+      \ 'callback': s:SNR . 'SelectMarkedFiles_cb({{M}}, {{i}}, '''')', 
+      \ 'columns': 1,
+      \ 'keymap': [
+         \ ['gs', 'vim:' . s:SNR . 'SelectMarkedFiles_cb({{M}}, {{i}}, ''s'')'],
+         \ ['gv', 'vim:' . s:SNR . 'SelectMarkedFiles_cb({{M}}, {{i}}, ''v'')'],
+         \ ['gt', 'vim:' . s:SNR . 'SelectMarkedFiles_cb({{M}}, {{i}}, ''t'')'],
+         \ ['\<s-cr>', 'vim:' . s:SNR . 'SelectMarkedFiles_cb({{M}}, {{i}}, ''t'')'],
+      \  ]
+      \ })
+   
 endfunc
 
 " =========================================================================== 

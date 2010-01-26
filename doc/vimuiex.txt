@@ -52,7 +52,7 @@ The following commands are available when in normal operation:
    <CR>			     select the current item and execute a command
    wh, wj, wk, wl	     move window to border
    wc, wv, wC		     center window
-   m                         toggle item marked state
+   m                         toggle item's marked state
 
 				       *vimuiex-filtering*
 In filtering mode new ASCII characters are added to the filter and only the 
@@ -126,6 +126,9 @@ Example:
 ==============================================================================
 PYTHON LIBRARY USAGE				        *vimuiex-pythonlib*
 
+NOTE: From version 0.7 the function vimuiex#vxlist#VxPopup() is available
+which allows the use of the popup listbox with pure vimscript. Some
+documentation is in the code (vxlist.vim, example in vxcapture.vim).
 
 Example: Display a list of buffers		       *vimuiex-list-example*
 
@@ -195,24 +198,11 @@ when it is not needed.
 See also code in: vxbuflist.vim, vxtextmenu.vim, vxrecentfile.vim
 
 
-Global python variables				  *vimuiex-python-global-vars*
-
-Some global variables are used by the subsystem that displays the listbox.  
-These are defined in modules 'modpython.globals.*'.
-
-The curses implementation defines a global screen variable that is used to 
-access some curses functions (eg. getch). Curses initialization is done only 
-the first time gcurses.vimPrepareScreen() is called. The function also returns 
-a reference to the global screen variable.
-
-The wx implementation creates a global application variable which can be 
-obtained with the function gwx.vimPrepareWx().
-
-
 Initial position of the window			  *vimuiex-python-position*
+------------------------------
 
 TODO: Changed in version 0.6.
-Example: >
+Example (.vimrc): >
       call vxlib#plugin#Init()
       VxLet VxPopupListPos default "position=525"
       VxLet VxPopupListPos VxBufListSelect "position=534 minsize=0.5,8"

@@ -6,7 +6,7 @@
 " License: GPL (http://www.gnu.org/copyleft/gpl.html)
 " This program comes with ABSOLUTELY NO WARRANTY.
 "
-" (requires python; works only in terminal; using curses)
+" (requires python; requires python_screen vim patch)
 
 if vxlib#plugin#StopLoading('#au#vimuiex#vxjump')
    finish
@@ -16,13 +16,11 @@ endif
 " Local Initialization - on autoload
 " =========================================================================== 
 call vxlib#python#prepare()
-"map <SID>xx <SID>xx
-"let s:SID = substitute(maparg('<SID>xx'), '<SNR>\(\d\+_\)xx$', '\1', '')
-"unmap <SID>xx
+" exec vxlib#plugin#MakeSID()
 " =========================================================================== 
 
 function! vimuiex#vxjump#VxLineJump()
-" exec 'python VIM_SNR_VXTEXTMENU="<SNR>' . s:SID .'"'
+" exec 'python VIM_SNR_VXTEXTMENU="' . s:SNR .'"'
 
 python << EOF
 import vim
@@ -35,7 +33,7 @@ EOF
 endfunc
 
 function! vimuiex#vxjump#VxWindowJump()
-" exec 'python VIM_SNR_VXTEXTMENU="<SNR>' . s:SID .'"'
+" exec 'python VIM_SNR_VXTEXTMENU="' . s:SNR .'"'
 
 python << EOF
 import vim

@@ -238,16 +238,21 @@ class CFileBrowser(popuplist.CList):
             vim.command(cmd)
             return "quit"
         else:
-            vimpar = ",".join(["'%s'" % p for p in parms])
+            vimpar = ",".join(["'%s'" % p for p in parms]) # TODO: escape string
             if vimpar == "": vimpar = "''"
-            expr = self.callbackEditFile # TODO: check string encoding!
-            expr = expr.replace("{{s}}", "'%s'" % fn)
-            expr = expr.replace("{{p}}", vimpar)
+            def expandParam_p(theList, allitems, item): return vimpar
+            expr = self.expandVimCommand(self.callbackEditFile, curindex, { "{{p}}": expandParam_p })
             try:
                 rv = vim.eval(expr)
                 if rv == "q": return "quit"
-            except: pass
+            except Exception as e:
+                vim.command("echom '_diredSelect: %s'" % e)
+                pass
         return ""
+
+    def expandVimCommand(self, command, curindex, extraParamHandlers={}):
+        extraParamHandlers["{{pwd}}"] = lambda s,a,i: "'%s'" % self.currentPath # TODO: escape string
+        return popuplist.CList.expandVimCommand(self, command, curindex, extraParamHandlers)
 
     # cmd exception: the command can have parameters
     def doListCommand(self, cmd, curindex):

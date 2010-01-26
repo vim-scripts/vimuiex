@@ -30,7 +30,7 @@ endfunc
 function! s:SaveHistories()
    let saved = []
    for histname in keys(s:UserHistory)
-      call add(saved, ">" . histname)
+      call add(saved, '>' . histname)
       for item in s:UserHistory[histname]
          let item = substitute(item, "\x01", "\x01\x02", 'g')
          let item = substitute(item, "\x0a", "\x01\x03", 'g')
@@ -43,17 +43,18 @@ endfunc
 
 function! s:RestoreHistories()
    let saved = split(g:CUSTOM_HISTORIES, "\n")
-   let histname = ""
+   let histname = ''
    for item in saved
-      let item = substitute(item, "\x01\x02", "\x01", 'g')
       let item = substitute(item, "\x01\x03", "\x0a", 'g')
       let item = substitute(item, "\x01\x04", "\x0d", 'g')
-      let text = strpart(item, 1)
-      if item =~ '^.' && histname != ''
-         call add(s:UserHistory[histname], text)
-      elseif item =~ '^>'
+      let item = substitute(item, "\x01\x02", "\x01", 'g')
+      let type = item[0]
+      let text = item[1:]
+      if type == '>'
          let s:UserHistory[text] = []
          let histname = text
+      elseif type == '.' && histname != ''
+         call add(s:UserHistory[histname], text)
       endif
    endfor
    unlet g:CUSTOM_HISTORIES
@@ -112,11 +113,13 @@ function! vxlib#hist#AddHistory(name, item)
       call histadd(a:name, a:item)
    else
       if has_key(s:UserHistory, a:name)
-         let l:list = s:UserHistory[a:name]
-         call add(l:list, a:item)
-         let l:ilast = len(l:list) - &history - 1
-         if l:ilast > 0 | call remove(l:list, 0, l:ilast) | endif
-         let s:UserHistory[a:name] = l:list
+         let hlist = s:UserHistory[a:name]
+         let iit = index(hlist, a:item)
+         if iit >= 0 | call remove(hlist, iit) | endif
+         call add(hlist, a:item)
+         let ilast = len(hlist) - &history - 1
+         if ilast > 0 | call remove(hlist, 0, ilast) | endif
+         let s:UserHistory[a:name] = hlist
       else
          let s:UserHistory[a:name] = [a:item]
       endif

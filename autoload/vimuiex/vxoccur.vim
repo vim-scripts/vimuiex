@@ -14,12 +14,8 @@ endif
 " Local Initialization - on autoload
 " =========================================================================== 
 call vxlib#python#prepare()
-map <SID>xx <SID>xx
-let s:SID = substitute(maparg('<SID>xx'), '<SNR>\(\d\+_\)xx$', '\1', '')
-unmap <SID>xx
-
+exec vxlib#plugin#MakeSID()
 call vimuiex#vxoccur_defaults#Init()
-
 " =========================================================================== 
 
 let s:capture = []
@@ -56,6 +52,74 @@ function! s:AddOccurenceLineF(funcname)
    let s:capture += [printf(' %2d: %3d %s', n, pos, trline)]
 endfunc
 
+" Asks the user to define a search range:
+"   -b - current buffer
+"   -d [filemask, ...] - current buffer directory
+"   -D [filemask, ...] - current buffer directory and subdirectories
+"   -w [filemask, ...] - working directory
+"   -W [filemask, ...] - working directory and subdirectories
+"   TODO: .B - listed buffers
+"
+" NOTES:
+" Entries may start with '-'. To use the previous search range (displayed in
+" []), enter '-' (default value). The prefix '-' is used because input() can't
+" distinguish between an empty string and a cancelled input.
+function! s:GetSearchRange()
+   call inputsave()
+   let hinp = vxlib#hist#GetHistory('input')
+   call vxlib#hist#CopyHistory('occurrange', 'input')
+   let default = histget('input', -1)
+   if default == '' | let default = 'b' | endif
+   if len(default) < 12 | let disp = default
+   else | let disp = default[:11] . ' ...'
+   endif
+ 
+   " range: b buffer, d ... buffer directory, w ... working directory, ...
+   let range = input('Range (bdDwW)[' . disp . ']: ', '-')
+   call vxlib#hist#SetHistory('input', hinp)
+   call inputrestore()
+
+   if range == '' | return '' | endif
+   if match(range, '^\s*-\s*$') >= 0 | let range = default
+   endif
+   let range = matchstr(range, '^\s*-*\zs.*$')
+
+   call vxlib#hist#AddHistory('occurrange', '-' . range)
+   return range
+endfunc
+
+" Prepares and executes a vimgrep command
+" Stores search results in s:capture (copied from QuickFix list)
+" TODO: shoud it use location list and clean it aferwards?
+function! s:VimGrepFiles(word, range)
+   let type = a:range[0]
+   let filter = split(a:range[1:])
+   if len(filter) < 1 | let filter = ['*'] | endif
+
+   let saveic=&ignorecase
+   set noignorecase
+   if type == 'd' || type == 'D' | let dir = '%:p:h'
+   elseif type == 'w' || type == 'W' | let dir = getcwd()
+   else | let dir = '.'
+   endif
+   if type == 'W' || type == 'D' | let dirsep = '/**/'
+   else | let dirsep = '/' | endif
+   let &ignorecase = saveic
+
+   let vgexpr = '1000vimgrep /' . a:word . '/j'
+   for af in filter
+      " TODO: d+../.. - additional base path defined with type; completion;
+      "       d=absolute path; completion
+      let vgexpr = vgexpr . ' ' . dir . dirsep . af
+   endfor
+
+   try
+      exec vgexpr
+   catch /E480/
+   endtry
+   let [dummy, s:capture] = vimuiex#vxquickfix#TransformQfItems(getqflist())
+endfunc
+
 function! vimuiex#vxoccur#VxOccur()
    call inputsave()
    let l:hinp = vxlib#hist#GetHistory('input')
@@ -72,17 +136,28 @@ function! vimuiex#vxoccur#VxOccur()
    else
       return
    endif
-   let s:capMatch = s:capWord
-   let s:capture = [bufname('%')]
-   let l:curpos = getpos('.')
-   norm! gg
-   silent execute 'g/' . s:capMatch . '/call s:AddOccurenceLine()'
-   call setpos(".", l:curpos)
+
+   let range = s:GetSearchRange()
+   if range == '' | return | endif
+
+   if match(range[0], '\C[dDwW]') >= 0
+      call s:VimGrepFiles(s:capWord, range)
+      let title = 'Vimgrep: ' . s:capWord
+   else
+      let s:capMatch = s:capWord
+      let s:capture = [bufname('%')]
+      let l:curpos = getpos('.')
+      norm! gg
+      silent execute 'g/' . s:capMatch . '/call s:AddOccurenceLine()'
+      call setpos('.', l:curpos)
+      let title = 'Buffer search: ' . s:capWord
+   endif
    if len(s:capture) < 2
       echo 'No occurences of "' . s:capWord . '" were found.'
       return
    endif
-   call s:VxShowCapture()
+
+   call s:VxShowCapture('VxOccur', title)
 endfunc
 
 function! vimuiex#vxoccur#VxOccurCurrent()
@@ -95,7 +170,7 @@ function! vimuiex#vxoccur#VxOccurCurrent()
       let s:capWord = '<>'
       let s:capMatch = '^$'
    endtry
-   call s:VxShowCapture()
+   call s:VxShowCapture('VxOccurCurrent', 'Tag search: ' . s:capWord)
 endfunc
 
 function! vimuiex#vxoccur#VxOccurRoutines()
@@ -104,7 +179,7 @@ function! vimuiex#vxoccur#VxOccurRoutines()
       echom 'Routine regexp not defined for ft=' . &ft
    else
       let s:capture = [bufname('%')]
-      let s:capWord = 'Routines, ft=' . &ft
+      let title = 'Routines, ft=' . &ft
       let s:capMatch = l:dict[&ft].regexp
       let gcmd = 'call s:AddOccurenceLine()'
       if has_key(l:dict[&ft], 'call') == 0
@@ -123,13 +198,13 @@ function! vimuiex#vxoccur#VxOccurRoutines()
       norm! gg
       silent execute 'g/' . s:capMatch . '/' . gcmd
       call setpos('.', curpos)
-      call s:VxShowCapture()
+      call s:VxShowCapture('VxOccurRoutines', title)
    endif
 endfunc
 
 function! vimuiex#vxoccur#VxOccurTags()
    let s:capture = [bufname('%')]
-   let s:capWord = 'Tags'
+   let title = 'Tags'
    let s:capMatch = ''
    let cmd = 'ctags -f - --format=2 --excmd=pattern --fields=nks --sort=no'
    let filename = fnamemodify(bufname('%'), ':p')
@@ -145,7 +220,7 @@ function! vimuiex#vxoccur#VxOccurTags()
          let l:n += 1
       endif
    endfor
-   call s:VxShowCapture()
+   call s:VxShowCapture('VxOccurTags', title)
 endfunc
 
 function! vimuiex#vxoccur#VxSourceTasks()
@@ -153,14 +228,29 @@ function! vimuiex#vxoccur#VxSourceTasks()
       echo 'List of task words is empty. You need to set g:vxoccur_task_words.'
       return
    endif
-   let s:capture = [bufname('%')]
-   let s:capWord = 'Tasks in Source'
-   let s:capMatch = join(g:vxoccur_task_words, '\|')
-   let curpos = getpos('.')
-   norm! gg
-   silent execute 'g/' . s:capMatch . '/call s:AddOccurenceLine()'
-   call setpos('.', curpos)
-   call s:VxShowCapture()
+
+   let range = s:GetSearchRange()
+   if range == '' | return | endif
+
+   if match(range[0], '\C[dDwW]') >= 0
+      call s:VimGrepFiles('\C' . join(g:vxoccur_task_words, '\|'), range)
+      let title = 'Tasks in Source (vimgrep)'
+   else
+      let s:capture = [bufname('%')]
+      let s:capMatch = '\C' . join(g:vxoccur_task_words, '\|')
+      let curpos = getpos('.')
+      norm! gg
+      silent execute 'g/' . s:capMatch . '/call s:AddOccurenceLine()'
+      call setpos('.', curpos)
+      let title = 'Tasks in Source'
+   endif
+
+   if len(s:capture) < 2
+      echo 'No source tasks were found.'
+      return
+   endif
+
+   call s:VxShowCapture('VxSourceTasks', title)
 endfunc
 
 function! s:ExtractItemPos(index)
@@ -194,7 +284,7 @@ endfunc
 function! s:OpenPreview(pos, size)
    pclose | split
    if match(a:pos, '^[HJKL]$') >= 0
-      exec 'norm ' . a:pos
+      exec 'norm \<c-w>' . a:pos
    endif
    set previewwindow cursorline
    if match(a:pos, '^[HL]$') >= 0
@@ -232,27 +322,20 @@ function! s:PreviewItem_cb(index)
    return ''
 endfunc
 
-" TODO: VxShowCapture: parameterer optid for each type of occur
-function! s:VxShowCapture()
-exec 'python VIM_SNR_VXOCCUR="<SNR>' . s:SID .'"'
-exec 'python VIM_VXOCUR_WORD="""' . escape(s:capWord, '"\'). '"""'
-
-let s:preview_on = 0
-python << EOF
-import vim
-import vimuiex.popuplist as lister
-List = lister.CList(title="'%s'" % VIM_VXOCUR_WORD, optid="VxOccur")
-List.loadVimItems("%sGetOccurCapture()" % VIM_SNR_VXOCCUR)
-List.cmdAccept = "%sSelectItem_cb({{i}})" % VIM_SNR_VXOCCUR
-List.keymapNorm.setKey(r"v", "vim:%sPreviewItem_cb({{i}})" % VIM_SNR_VXOCCUR)
-List.process(curindex=1)
-List=None
-EOF
-if s:preview_on
-   call s:ClosePreview()
-   norm zz
-endif
-
+function! s:VxShowCapture(occurType, title)
+   let s:preview_on = 0
+   call vimuiex#vxlist#VxPopup(s:GetOccurCapture(), a:title, {
+      \ 'optid': a:occurType,
+      \ 'current': 1,
+      \ 'callback': s:SNR . 'SelectItem_cb({{i}})',
+      \ 'keymap': [
+         \ ['v', 'vim:' . s:SNR . 'PreviewItem_cb({{i}})']
+      \  ]
+      \ })
+   if s:preview_on
+      call s:ClosePreview()
+      norm zz
+   endif
 endfunc
 
 " =========================================================================== 

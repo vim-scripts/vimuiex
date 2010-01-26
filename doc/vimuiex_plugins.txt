@@ -29,7 +29,9 @@ Commands defined in VxLib:
 ==============================================================================
 POPUP MENU NAVIGATOR				          *vimuiex-vxtextmenu*
 
-VxTextMenu                                       *vimuiex-vxtextmenu*
+VxTextMenu
+----------
+
 Displays a list of top-level menus in a popup listbox. An item from the menu 
 can be selected as described in |vimuiex-operation|. When <CR> is pressed on a 
 selected item it is activated. If the item is a submenu it will be displayed, 
@@ -48,6 +50,8 @@ and enter normal listbox navigation mode, press '&'.
 POPUP BUFFER EXPLORER					   *vimuiex-vxbuflist*
 
 VxBufListSelect                                  *vimuiex-vxbuflistselect*
+---------------
+
 Displays a list of buffers in an overlapping window. A buffer can be selected 
 from the list as described in |vimuiex-operation|. When <CR> is perssed on a 
 selected buffer the list is closed an the selected buffer is activated. Other
@@ -104,11 +108,12 @@ Settings for the plugin:
 BROWSE THE FILESYSTEM TO OPEN A FILE                    *vimuiex-vxdired*
 
 VxFileBrowser                                    *vimuiex-vxfilebrowser*
+-------------
 
 Displays the contents of a directory implied by the |browsedir| option. The
-subdirectories are marked with a preceeding '+'. The files are sorted by name.
-A file or a directory can be selected from the list as described in
-|vimuiex-operation|.  When <CR> is pressed on a selected file, that file is
+subdirectories are displayed with a preceeding '+'. The files are sorted by
+name.  A file or a directory can be selected from the list as described in
+|vimuiex-operation|. When <CR> is pressed on a selected file, that file is
 loaded (if not already loaded) and activated. The selected file can also be
 opened with the following commands:
 
@@ -116,14 +121,22 @@ opened with the following commands:
   gv	     Open selected file with vsplit
   gt, <c-cr> Open selected file in a new tab
 
-If <CR> is pressed on a subdirectory, its contents is displayed in the
-list. When <BS> is pressed on any item, the curent directory is closed an 
-its parent directory is displayed.
+If <CR> is pressed on a subdirectory, its contents is displayed in the list.
+When <BS> is pressed on any item, the curent directory is closed and its
+parent directory is displayed. When changing directories, currently marked
+items are unmarked.
+
+If files are marked, they will be open instead of the selected file, unless
+the selected item is a directory. In this case a directory change will be
+executed.
 
 Pressing 'd' on any item will close the file list and display a list of 
 directories from which files were recently loaded. If <CR> is pressed on a 
 selected directory, the list of directories will close and the content of the 
 selected directory will be displayed in the file list.
+
+If 'e' is pressed the user is prompted for the name of a (new) file to be
+open in the currently displayed directory.
 
 Files from subdirectories of the current directory can be displayed in a
 single list. To increase the number of subdirectory levels to be displayed
@@ -145,7 +158,9 @@ ENHANCE INTERNAL COMMANDS                              *vimuiex-vxcapture*
 
 
 VxCmd                                            *vimuiex-vxcmd*
-Capture the output of a Vim command and display it in a popup list. Examples:
+-----
+
+Captures the output of a Vim command and display it in a popup list. Examples:
 
    Show the list of Vim buffers (see also |vimuiex-vxbuflist|): >
    :VxCmd ls
@@ -158,24 +173,29 @@ Note: VxCmd will fail if the Vim command calls |redir| during execution.
 
 
 VxMan                                            *vimuiex-vxman*
-Capture the output of a man command and display it in a popuplist. This 
+-----
+
+Captures the output of a man command and displays it in a popuplist. This 
 command is a shorthand for: >
    :VxCmd !man -P cat <man-query> | col -b
 <
 and requires the col program from the bsdmainutils debian package.
 
-To replace the default command K use:
+To replace the default command K use: >
    nmap <silent> K :VxMan <cword> <CR>
-
+<
 
 VxDisplay					 *vimuiex-vxdisplay*
-Display the contents of the registers (output of the :display command) in a 
+---------
+Displays the contents of the registers (output of the :display command) in a 
 popup listbox. If <CR> is pressed on a selected item, the contents of the 
-register is pasted into current buffer.
+register is pasted into current buffer. If <@> is pressed on a selected item,
+the contents of the register will be executed as a macro.
 
 
 VxMarks						 *vimuiex-vxmarks*
-Display the marks (output of the :marks command) in a popup listbox. If <CR> 
+-------
+Displays the marks (output of the :marks command) in a popup listbox. If <CR> 
 is pressed on a valid mark, the cursor jumps to that mark.
 
 
@@ -193,12 +213,21 @@ the preview window, needs to be resized/moved).
 
 
 VxOccur                                          *vimuiex-vxoccur*
-Prompts for a regular expression and finds all occurences of the expression in
-the current buffer. The lines with the matches are displayed in the popup
-listbox. 
+-------
+
+Prompts for a regular expression to search for and a range of files to process
+(|vimuiex-filerange|). The matching lines from the selected range of files are
+displayed in the popup listbox. 
+
+The command vimgrep is used to make the search if the file range is other than
+the current buffer. In this case the QuikcFix list is populated before the
+list is passed to the popup listbox. After the listbox closes, the results are
+still available in the QuikcFix list.
 
 
 VxOccurCurrent                                   *vimuiex-vxoccurcurrent*
+--------------
+
 Captures the output of the command '[I' and displays it in the popup listbox.
 
 Suggested keyboard mapping:
@@ -207,11 +236,15 @@ Suggested keyboard mapping:
 <
    
 VxOccurTags                                      *vimuiex-vxoccurtags*
+-----------
+
 Passes the current file to ctags and displays the results in the popup
 listbox.
 
 
 VxOccurRoutines                                  *vimuiex-vxoccurroutines*
+---------------
+
 Finds definitions of "routines" in the current buffer. Routines are defiend
 with regular expressions (one regexp for each filetype) which are stored in
 a global routine definition dictionary.
@@ -222,13 +255,47 @@ Example:
 <
 
 VxSourceTasks                                    *vimuiex-vxsourcetasks*
-Finds tasks in source and displays them in a popup listbox. The tasks are 
-marked with special words which can be defined in a global variable:
+-------------
+
+Finds lines with tasks in the selected range of files (|vimuiex-filerange|)
+and displays them in a popup listbox. The tasks are marked with special words
+which can be defined in a global variable:
 >
    let g:vxoccur_task_words=['TODO', 'FIXME', 'BUG']
 <
 The default task words are: ['COMBAK', 'TODO', 'FIXME', 'XXX']
 
+
+File ranges used with VxOccur                    *vimuiex-filerange*
+-----------------------------
+
+Currently these ranges can be selected:
+   -b => current buffer
+   -d [filemask, ...] => current buffer directory
+   -D [filemask, ...] => current buffer directory and subdirectories
+   -w [filemask, ...] => working directory
+   -W [filemask, ...] => working directory and subdirectories
+   - => use the last used range
+
+The range is entered when Vim displays a prompt like
+>
+   Range (bdDwW)[-b]: -
+<
+The available ranges are displayed in () and a part of the last used range is
+displayed in []. Different ranges can be entered or selected from history. An
+empty range will cancel a VxOccur operation.
+
+Example: search in txt and doc files in current directory and subdirectories:
+>
+   Range (bdDwW)[-b]: -D *.txt *.doc
+<
+
+NOTE:
+The prefix '-' is used because input() can't distinguish between an empty
+string and a cancelled input. To reuse the last used search range, the user
+can press enter after the prompt is displayed if a nonempty default value is
+used. The procedure can also recognize a range if it doesn't start with '-',
+but it will be added to the history with the prefix '-'.
 
 ==============================================================================
 JUMP TO SCREEN LOCATION WITH KEYBOARD			   *vimuiex-vxjump*
@@ -236,12 +303,16 @@ JUMP TO SCREEN LOCATION WITH KEYBOARD			   *vimuiex-vxjump*
 NOTE: These plugins require "+python_screen" feature
 
 VxLineJump                                       *vimuiex-vxlinejump*
+----------
+
 Displays lables in the line-number area and waits for the user to enter a
 label. When the label is entered, the cursor moves to the line with the
 corresponding label.
 
 
 VxWindowJump                                     *vimuiex-vxwindowjump*
+------------
+
 Displays a label in the center of every window and waits for the user to enter
 a label. When the label is entered, the cursor moves to the window with the
 corresponding label.

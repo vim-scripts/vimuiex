@@ -11,8 +11,10 @@ import shutil
 import optparse
 import re, string
 import datetime
+import plugconf
 
 options = None
+config = None
 
 separator = '''" ================================'''
 file_head = '''\
@@ -23,7 +25,10 @@ file_head = '''\
 "endif
 
 let s:exception_list = []
-function! s:Exception(throwpoint, exception, plugid)
+function! s:Exception(throwpoint, exception, plugid, loadstatus)
+   if a:loadstatus != 0
+      call vxlib#plugin#SetLoaded(a:plugid, a:loadstatus)
+   endif
    call add(s:exception_list, matchstr(a:throwpoint, ',\s*\zsline\s\+\d\+') . ' (' . a:plugid . '):')
    call add(s:exception_list, '   ' . a:exception)
    let g:VxPluginErrors[a:plugid] = a:exception
@@ -114,24 +119,24 @@ augroup END
 plugin_head = """\
 " Source: ${filename}
 " START Plugin
-if s:ContinueLoading('${plugin}')
+let s:curplugin='${plugin}'
+if s:ContinueLoading(s:curplugin)
 ${if_require}\
   try\
 """
 if_require_str="""\
  if !(%s)
-   call ${vxlib_plugin}SetLoaded('${plugin}', -2)
-   let g:VxPluginMissFeatures['${plugin}'] = '${require_expr}: ' ${require_status}
+   call ${vxlib_plugin}SetLoaded(s:curplugin, -2)
+   let g:VxPluginMissFeatures[s:curplugin] = '${require_expr}: ' ${require_status}
  else
 """
 endif_require_str="""\
  endif
 """
 plugin_tail = """\
-   call ${vxlib_plugin}SetLoaded('${plugin}', 1)
+    call ${vxlib_plugin}SetLoaded(s:curplugin, 1)
   catch /.*/
-   call ${vxlib_plugin}SetLoaded('${plugin}', -9)
-   call s:Exception(v:throwpoint, v:exception, '${plugin}')
+    call s:Exception(v:throwpoint, v:exception, s:curplugin, -9)
   endtry
 ${endif_require}\
 endif
@@ -146,7 +151,7 @@ startup_head = """\
 """
 startup_tail = """\
     catch /.*/
-      call s:Exception(v:throwpoint, v:exception, 'Startup: ${plugin}')
+      call s:Exception(v:throwpoint, v:exception, 'Startup: ${pluginid}', 0)
     endtry
    endfunc
    augroup G_${plugin}_auto_onetime
@@ -166,6 +171,10 @@ class CStdout:
     def write(self, str):
         print str
 
+class CNullOut:
+    def write(self, str):
+        pass
+
 class State:
     def __init__(self, filename):
         self.filename = filename
@@ -173,6 +182,7 @@ class State:
         self.pluginTag = ""
         self.pluginId = ""
         self.pluginAttrs = "" # except id
+        self.pluginConf = None
 
     @property
     def pluginVarname(self):
@@ -184,7 +194,7 @@ class State:
         return p.join(p.basename(p.dirname(self.filename)), p.basename(self.filename))
     
 def parseStartup(state, out):
-    data = { "plugin": state.pluginVarname }
+    data = { "plugin": state.pluginVarname, "pluginid": state.pluginId }
     out.write(string.Template(startup_head).substitute(data))
     while True:
         ln = state.f.readline()
@@ -224,11 +234,16 @@ def buildRequire(expr):
     else: return (if_require_str % ifexpr, hasexpr)
 
 def parsePlugin(state, blockLine, moPlugin, out):
+    global config
     data = {
         "vxlib_plugin": vxlib_plugin,
         "plugin": state.pluginId,
         "filename": state.shortFilename
     }
+
+    try: enabled = int(state.pluginConf.getValue("enabled"))
+    except: enabled = 1 # TODO: get from [default] section
+    if enabled < 0: out = CNullOut() # no output
 
     mo = re.search(r'''\brequire\s*=\s*["']([^"']+)["']''', state.pluginAttrs)
     if mo == None: require = ""
@@ -249,6 +264,8 @@ def parsePlugin(state, blockLine, moPlugin, out):
         if mo != None:
             out.write(string.Template(plugin_tail).substitute(data))
             return ln
+
+        if enabled < 0: continue
         mo = re.match(r'''\s*"\s*<STARTUP>''', ln)
         if mo != None:
             ln = parseStartup(state, out)
@@ -273,6 +290,7 @@ def parseFile(fn, out):
             state.pluginId = mo.group(1)
             state.pluginAttrs = mo.group(2)
             state.pluginTag = ln
+            state.pluginConf = config.getPluginConf(state.pluginId)
             ln = parsePlugin(state, ln, mo, out)
             if ln == None: break
             continue
@@ -285,6 +303,7 @@ def readOptions():
     parser.add_option("-v", "--verbose", action="store", type="int", dest="verbose")
     parser.add_option("-q", "--quiet", action="store_const", const=0, dest="verbose")
     parser.add_option("", "--no-require", action="store_const", const=0, dest="add_require", default=1)
+    # TODO: -c configfile; -u update config file
 
     (options, args) = parser.parse_args()
     if options.verbose > 3: print "Options parsed"
@@ -310,8 +329,11 @@ def getFileList(args):
     return files
 
 def main():
-    global options
+    global options, config
     options, args = readOptions()
+    config = plugconf.CPluginConfig()
+    # config.loadConfig("plugins.conf") # TODO -c option
+    config.getPluginConf("default")
     lst = getFileList(args)
     if len(lst) < 1:
         print "No files to process."
@@ -328,6 +350,7 @@ def main():
 
     out.write(separator)
     out.write(file_tail)
+    # config.saveConfig("out") # TODO: if -u option
 
 if __name__ == "__main__":
     main()

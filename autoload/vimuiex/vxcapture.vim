@@ -16,9 +16,7 @@ endif
 " Local Initialization - on autoload
 " =========================================================================== 
 call vxlib#python#prepare()
-map <SID>xx <SID>xx
-let s:SID = substitute(maparg('<SID>xx'), '<SNR>\(\d\+_\)xx$', '\1', '')
-unmap <SID>xx
+exec vxlib#plugin#MakeSID()
 let s:captured = []
 " =========================================================================== 
 
@@ -52,7 +50,7 @@ function! vimuiex#vxcapture#VxCmd(cmd)
    for line in t1
       call add(s:captured, vxlib#cmd#ReplaceCtrlChars(line))
    endfor
-   call vimuiex#vxlist#VxPopup(s:GetCaptured(), 'Command', '')
+   call vimuiex#vxlist#VxPopup(s:GetCaptured(), 'Command')
 endfunc
 
 function! vimuiex#vxcapture#VxCmd_QArgs(cmd)
@@ -74,7 +72,9 @@ function! s:SelectItem_marks(index)
 endfunc
 
 function! vimuiex#vxcapture#VxMarks()
-   call vimuiex#vxlist#VxPopup(s:GetMarkList(), 'Marks', '<SNR>' . s:SID . 'SelectItem_marks')
+   call vimuiex#vxlist#VxPopup(s:GetMarkList(), 'Marks',
+      \ { 'callback': s:SNR . 'SelectItem_marks({{i}})' }
+      \ )
 endfunc
 
 " ------------ Registers ---------------
@@ -82,25 +82,42 @@ function! s:GetRegisterList()
    let regs = vxlib#cmd#Capture('display', 1)
    call filter(regs, 'v:val =~ "^\"" ')
    call map(regs, 'substitute(v:val, "[ \t]\\+", " ", "g")')
-   let s:captured = map(copy(regs),  'matchstr(v:val, ''..\ze'')')
+   let s:captured = map(copy(regs),  'matchstr(v:val, ''.\zs.\ze'')')
    return regs
 endfunc
 
 function! s:SelectItem_regs(index)
-   let reg = s:captured[a:index]
-   exec 'norm ' . reg . 'p'
+   let nreg = s:captured[a:index]
+   exec 'norm "' . nreg . 'p'
 endfunc
 
+function! s:RunRegMacro_cb(index)
+   let nreg = s:captured[a:index]
+   exec 'norm @' . nreg
+   return 'q'
+endfunc
+
+"function! s:InitRegistersList(pyListName)
+"   exec 'python ' . a:pyListName . '.keymapNorm.setKey(r"@", "vim:' . s:SNR . 'RunRegMacro_cb({{i}})")'
+"endfunc
+" 'init': s:SNR . 'InitRegistersList',
+
 function! vimuiex#vxcapture#VxDisplay()
-   call vimuiex#vxlist#VxPopup(s:GetRegisterList(), 'Registers', '<SNR>' . s:SID . 'SelectItem_regs')
+   call vimuiex#vxlist#VxPopup(s:GetRegisterList(), 'Registers', {
+      \ 'callback': s:SNR . 'SelectItem_regs({{i}})',
+      \ 'keymap': [
+         \ ['@', 'vim:' . s:SNR . 'RunRegMacro_cb({{i}})']
+      \  ]
+      \ })
 endfunc
 
 " ------------ Man pages ---------------
-"  TODO: Use MANWIDTH to set the width of the output
+"  Use MANWIDTH to set the width of the output
 function! vimuiex#vxcapture#VxMan(kwd)
-   "let mw = &columns - 40
-   "call vimuiex#vxcapture#VxCmd('!export MANWIDTH=' . mw .' | man -P cat ' . a:kwd . ' | col -b')
-   call vimuiex#vxcapture#VxCmd('!man -P cat ' . a:kwd . ' | col -b')
+   let mw = &columns - 20
+   if mw < 20 | let mw = 20 | endif
+   if mw > &columns | let mw = &columns | endif
+   call vimuiex#vxcapture#VxCmd('!MANWIDTH=' . mw . ' man -P cat ' . a:kwd . ' | col -b')
 endfunc
 
 function! vimuiex#vxcapture#VxMan_QArgs(first)

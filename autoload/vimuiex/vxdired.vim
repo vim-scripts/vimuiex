@@ -16,9 +16,7 @@ endif
 " Local Initialization - on autoload
 " =========================================================================== 
 call vxlib#python#prepare()
-map <SID>xx <SID>xx
-let s:SID = substitute(maparg('<SID>xx'), '<SNR>\(\d\+_\)xx$', '\1', '')
-unmap <SID>xx
+exec vxlib#plugin#MakeSID()
 " =========================================================================== 
 
 let s:lastdir = ''
@@ -30,6 +28,41 @@ endfunc
 function! s:OpenFile_cb(filename, winmode)
    call vxlib#cmd#Edit(a:filename, a:winmode)
    let s:lastdir = fnamemodify(a:filename, ':p:h')
+   return 'q'
+endfunc
+
+function! s:OpenMarkedFiles_cb(curdir, marked, selected, winmode)
+   if len(a:marked) < 1
+      return s:OpenFile_cb(a:curdir . '/' . a:selected, a:winmode)
+   endif
+   only
+   let first = 1
+   for fname in a:marked
+      call s:OpenFile_cb(a:curdir . '/' . fname, first ? '' : a:winmode)
+      let first = 0
+   endfor
+   let s:lastdir = a:curdir
+   return 'q'
+endfunc
+
+function! s:NewFile_cb(curdir)
+   let cwd = getcwd()
+   redraw!
+   echo a:curdir
+   try
+      " let hinp = vxlib#hist#GetHistory('input')
+      exec 'chdir ' . a:curdir
+      let newfn = input('Edit file:', '', 'file')
+      " call vxlib#hist#SetHistory('input', l:hinp) " restore
+   finally
+      exec 'chdir ' . cwd
+   endtry
+   if empty(newfn) | return '' | endif
+   try
+      exec 'edit ' . fnameescape(a:curdir . '/' . newfn)
+   catch /.*/
+      return ''
+   endtry
    return 'q'
 endfunc
 
@@ -56,18 +89,19 @@ endfunc
 " a callback and evaluate it. The internal command can accept one string
 " parameter (without quotes) which will be passed to vxlib#cmd#Edit.
 function! vimuiex#vxdired#VxFileBrowser()
-   exec 'python VIM_SNR_VXDIRED="<SNR>' . s:SID .'"'
+   exec 'python def SNR(s): return s.replace("$SNR$", "' . s:SNR . '")'
 
 python << EOF
 import vim
 import vimuiex.dired as dired
 FBrowse = dired.CFileBrowser(optid="VxFileBrowser")
-FBrowse.exprRecentDirList = "%sGetRecentDirList_cb()" % VIM_SNR_VXDIRED
-FBrowse.callbackEditFile = "%sOpenFile_cb({{s}}, {{p}})" % VIM_SNR_VXDIRED
-# default keymap
-FBrowse.keymapNorm.setKey(r"\<cr>", "list:dired-select") # also defined in python
+FBrowse.exprRecentDirList = SNR("$SNR$GetRecentDirList_cb()")
+FBrowse.callbackEditFile = SNR("$SNR$OpenMarkedFiles_cb({{pwd}}, {{S}}, {{s}}, {{p}})")
+# default command
+FBrowse.keymapNorm.setKey(r"\<cr>", "list:dired-select") # also mapped in python
 FBrowse.keymapNorm.setKey(r"\<c-cr>", "list:dired-select t")
-# keymaps: xs, xt, xv
+# additional commands
+FBrowse.keymapNorm.setKey(r"e", SNR("vim:$SNR$NewFile_cb({{pwd}})"))
 FBrowse.keymapNorm.setKey(r"gt", "list:dired-select t")
 FBrowse.keymapNorm.setKey(r"gs", "list:dired-select s")
 FBrowse.keymapNorm.setKey(r"gv", "list:dired-select v")

@@ -16,9 +16,7 @@ endif
 " Local Initialization - on autoload
 " =========================================================================== 
 call vxlib#python#prepare()
-map <SID>xx <SID>xx
-let s:SID = substitute(maparg('<SID>xx'), '<SNR>\(\d\+_\)xx$', '\1', '')
-unmap <SID>xx
+exec vxlib#plugin#MakeSID()
 " In console the menu might not have been loaded
 runtime! menu.vim
 " =========================================================================== 
@@ -42,13 +40,13 @@ endfunc
 " TODO: Remove some top-level entries from the menu (Toolbar, Popup)
 " TODO: Implement a pop-up context menu for textmode
 function! vimuiex#vxtextmenu#VxTextMenu()
-exec 'python VIM_SNR_VXTEXTMENU="<SNR>' . s:SID .'"'
+exec 'python def SNR(s): return s.replace("$SNR$", "' . s:SNR . '")'
 
 python << EOF
 import vim
 import vimuiex.textmenu as menu
 Menu = menu.CTextMenu(optid="VxTextMenu")
-Menu.loadMenuItems("%sGetMenu()" % VIM_SNR_VXTEXTMENU)
+Menu.loadMenuItems(SNR("$SNR$GetMenu()"))
 Menu.process(curindex=0)
 Menu=None
 EOF
