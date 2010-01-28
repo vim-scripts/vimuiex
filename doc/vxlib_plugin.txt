@@ -1,4 +1,4 @@
-*vxlib_plugin.txt*        Installable plugins        Last Change: October 2009
+*vxlib_plugin.txt*        Installable plugins       Last Change: January 2010
 
 ==============================================================================
 INSTALLABLE PLUGINS                                            *vxlib-plugin*
@@ -182,26 +182,35 @@ Example plugin (Hello "user"):
 How to Enable plugins in .vimrc			      *vxlib-plugin-enable*
 -------------------------------
 
-   Initially all the plugins are enabled by default. To disable an undesired 
-   plugin you can write 
+Some plugins store their options in global dictionaries that are not
+initialized until the plugin is read. This only happens after .vimrc is
+processed so a custom command for setting options is necessary. The command is
+called 'VxLet' and is created with
 >
-    vxlib#plugin#Init()
-    let g:VxPlugin["test#hello"] = 0
-  or
+    call vxlib#plugin#Init()
+<
+						      *vxlet*
+The command VxLet takes 3 parameters: the name of the global dictionary
+(without g:), the key under which an option is stored in the dictionary and
+a Vim expression that represents the new value for the option.
+
+Initially all the plugins are enabled by default. To disable an undesired
+plugin you can write 
+>
     VxLet VxPlugin test#hello 0
 <
-   The function vxlib#plugin#Init() is only used to autoload the vxlib#plugin 
-   module that creates g:VxPlugin if it doesn't exist.
-   
-   If you want to use only specific plugins, you can disable all the plugins 
-   by default using
+The global variable g:VxPlugin is created when the function plugin#Init() is
+called so plugins can also be disabled like this:
+>
+    let g:VxPlugin["test#hello"] = 0
+<
+If you want to use only specific plugins, you can disable all the plugins 
+by default using
 >
     let g:VxPluginEnabledDefault = 0
 <
-   and then for each plugin that you want to use
+and then for each plugin that you want to use
 >
-    let g:VxPlugin["test#hello"] = 1
-  or
     VxLet VxPlugin test#hello 1
 <
 

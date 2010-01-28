@@ -76,12 +76,13 @@ endfunc
 
 " Optional parameters in dictionary a:1
 "     a:1['optid'] -> options for listbox positioning
-"     a:1['init'] - initialization function name: function cb(pyListName)
+"     a:1['init'] - initialization function name: function cb(pyListName);
+"           called just before process()
 "     a:1['callback'] - callback expression for the 'accept' action
 "     a:1['prompt'] - the prompt to be displayed in the command line
 "     a:1['current'] - index of initially selected item
 "     a:1['marked'] - list of initially marked items indices;
-"            TODO: CList.setMarkedItems()
+"           TODO: CList.setMarkedItems()
 "     a:1['columns'] -> number of aligned columns (currently max 1)
 "     a:1['keymap*'] -> define (additional) keymap for mode *; list of key mappings
 "           '*' is one of '', '/', '&', '#'
@@ -137,9 +138,6 @@ function! vimuiex#vxlist#VxPopup(items, title, ...)
    python import vim, vimuiex.popuplist as lister
 
    exec 'python List = lister.CList(title="'. escape(a:title, '"\') .'", optid=r"' . optid . '")'
-   if cbinit != ''
-      exec 'call ' . cbinit . '("List")'
-   endif
    if prompt != ''
       exec 'python List.prompt="' . escape(prompt, '"\') . '"'
    endif
@@ -153,6 +151,9 @@ function! vimuiex#vxlist#VxPopup(items, title, ...)
    exec 'python List.cmdAccept="' . escape(callback, '"\') . '"'
    if columns > 0
       python List._firstColumnAlign = True
+   endif
+   if cbinit != ''
+      exec 'call ' . cbinit . '("List")'
    endif
    exec 'python List.process(curindex=' . current . ')'
    python List=None
@@ -203,13 +204,14 @@ endfunc
 function! vimuiex#vxlist#CheckHilightItems()
    let bg0 = "DarkGray"
    let bg1 = "Black"
-   let bc0 = "LightGray"
-   let bc1 = "Black"
-   exec "hi def VxNormal term=reverse" . s:MakeCTerm(bc0, "Black") . s:MakeGui(bg0, "Black")
-   exec "hi def VxSelected term=NONE" . s:MakeCTerm(bc1, "LightGray") . s:MakeGui(bg1, "White")
-   exec "hi def VxQuickChar term=reverse,standout" . s:MakeCTerm(bc0, "DarkRed") . s:MakeGui(bg0, "White")
-   exec "hi def VxMarked term=reverse,standout" . s:MakeCTerm(bc0, "DarkRed") . s:MakeGui(bg0, "Yellow")
-   exec "hi def VxSelMarked term=NONE" . s:MakeCTerm(bc1, "DarkRed") . s:MakeGui(bg1, "Yellow")
+   let bt0 = "LightGray"
+   let bt1 = "Black"
+   exec "hi def VxNormal term=reverse" . s:MakeCTerm(bt0, "Black") . s:MakeGui(bg0, "Black")
+   exec "hi def VxSelected term=NONE" . s:MakeCTerm(bt1, "LightGray") . s:MakeGui(bg1, "White")
+   exec "hi def VxQuickChar term=reverse,standout" . s:MakeCTerm(bt0, "DarkRed") . s:MakeGui(bg0, "White")
+   exec "hi def VxMarked term=reverse,standout" . s:MakeCTerm(bt0, "DarkRed") . s:MakeGui(bg0, "Yellow")
+   exec "hi def VxSelMarked term=NONE" . s:MakeCTerm(bt1, "DarkRed") . s:MakeGui(bg1, "Yellow")
+   exec "hi def VxTitle term=reverse" . s:MakeCTerm(bt0, "DarkBlue") . s:MakeGui(bg0, "Blue")
 endfunc
 
 " =========================================================================== 

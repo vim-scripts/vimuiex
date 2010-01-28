@@ -209,6 +209,7 @@ class CPopupListbox(object):
             if i == self.curindex and marked: co = self.coSelMarked
             elif i == self.curindex: co = self.coSelected
             elif marked: co = self.coMarked
+            elif items[i].isTitle: co = self.coTitle
             else: co = self.coNormal
             if y < self.lastline: win.addstr(y, 0, line, co)
             else: win.insstr(y, 0, line, co)
@@ -523,6 +524,7 @@ class CPopupListboxScreen(CPopupListbox):
             self.coHilight = vim.screen.getHighlightAttr("VxQuickChar")
             self.coMarked = vim.screen.getHighlightAttr("VxMarked")
             self.coSelMarked = vim.screen.getHighlightAttr("VxSelMarked")
+            self.coTitle = vim.screen.getHighlightAttr("VxTitle")
             if self.coNormal == self.coSelected: raise
         except:
             self.coNormal = 1
@@ -530,6 +532,7 @@ class CPopupListboxScreen(CPopupListbox):
             self.coHilight = 3
             self.coMarked = 4
             self.coSelMarked = self.coSelected
+            self.coTitle = self.coMarked
     pass
 
 class CPopupListboxCurses(CPopupListbox):
@@ -543,11 +546,18 @@ class CPopupListboxCurses(CPopupListbox):
             self.coSelected = curses.color_pair(2)
             curses.init_pair(3, curses.COLOR_RED, curses.COLOR_WHITE)
             self.coHilight = curses.color_pair(3)
+            curses.init_pair(4, curses.COLOR_MAGENTA, curses.COLOR_WHITE)
+            self.coMarked = curses.color_pair(4)
+            curses.init_pair(5, curses.COLOR_MAGENTA, curses.COLOR_BLUE)
+            self.coSelMarked = curses.color_pair(5)
+            curses.init_pair(6, curses.COLOR_BLUE, curses.COLOR_WHITE)
+            self.coTitle = curses.color_pair(6)
         else:
             self.coNormal = curses.A_NORMAL
             self.coSelected = curses.A_UNDERLINE
             self.coHilight = curses.A_UNDERLINE
             self.coMarked = self.coHilight
             self.coSelMarked = self.coSelected
+            self.coTitle =  self.coNormal
     pass
 

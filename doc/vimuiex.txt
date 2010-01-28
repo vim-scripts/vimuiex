@@ -1,4 +1,4 @@
-*vimuiex.txt*        User Interface Extensions      Last Change: November 2009
+*vimuiex.txt*        User Interface Extensions      Last Change: January 2010
 
 User Interface Extensions (Experiment)
 Version 0.6

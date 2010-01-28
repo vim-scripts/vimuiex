@@ -5,10 +5,11 @@ QuickFix preview                                       *vxlib-quickfixpreview*
 ----------------
 
 Adds mappings to the QuickFix window that enable the use of the preview window
-from the QuickFix window. When <space> is pressed on the current line in
-QuickFix window, the location is shown in the preview window. When <cr> or <p>
-is pressed on the current line, the preview window is closed and the location
-is shown in a normal window. Pressing <P> closes the preview window.
+from the QuickFix window. When <space> or <p> is pressed on the current line
+in QuickFix window, the location is shown in the preview window. When <cr> is
+pressed on the current line, the preview window is closed and the location is
+shown in a normal window. To close the preview window while the QuickFix
+window is active, press <P>.
 
 
 ## vim:tw=78:noet:wrap:ts=8:ft=help:norl:

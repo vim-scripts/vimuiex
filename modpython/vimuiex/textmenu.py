@@ -180,7 +180,11 @@ class CTextMenu(popuplist.CList):
                 path.append(mnu)
                 path = [m.getEmenuText() for m in path]
                 path = ".".join(path).encode(encoding)
-                vim.command('emenu %s' % path)
+                try:
+                    # TODO: implement emenu in a vim function (callback) and use vim.eval.
+                    vim.command('emenu %s' % path)
+                except vim.error:
+                    vim.command("echom 'menu-select: vim.error caught'")
                 return "quit" 
         elif cmd == "menu-goback":
             if len(self.menupath) > 0:

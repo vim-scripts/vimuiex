@@ -322,10 +322,17 @@ function! s:PreviewItem_cb(index)
    return ''
 endfunc
 
+function! s:InitVxShowCapture(pyListVar)
+   " Items that start with number and colon are NOT title items; others are
+   exec 'python ' . a:pyListVar . '.setTitleItems(r"^\s*\d+:", 0)'
+   exec 'python ' . a:pyListVar . '.hasTitles = True'
+endfunc
+
 function! s:VxShowCapture(occurType, title)
    let s:preview_on = 0
    call vimuiex#vxlist#VxPopup(s:GetOccurCapture(), a:title, {
       \ 'optid': a:occurType,
+      \ 'init': s:SNR . 'InitVxShowCapture',
       \ 'current': 1,
       \ 'callback': s:SNR . 'SelectItem_cb({{i}})',
       \ 'keymap': [

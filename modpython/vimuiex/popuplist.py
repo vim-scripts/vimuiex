@@ -43,7 +43,7 @@ def vimScreenSize():
 
 class CListItem(object):
     def __init__(self, text=""):
-        self.flags = 0
+        self.isTitle = False     # True if this item is a title
         self._text = text
         self.quickchar = None
         self.marked = 0
@@ -95,7 +95,7 @@ class CList(object):
         self.__items = None     # Displayed (filtered) items; delayed creation in items()
         self.__listbox = None   # Listbox implementation
         self.sort = True        # sort input list
-        self.filtersort = True  # sort filterd data (quickchar, startswith, contains)
+        self.filtersort = True  # sort filtered data (quickchar, startswith, contains)
         self.keymapNorm = simplekeymap.CSimpleKeymap()
         self.keymapFilter = simplekeymap.CSimpleKeymap()
         self.keymapQuickChar = simplekeymap.CSimpleKeymap()
@@ -104,6 +104,7 @@ class CList(object):
         self.cmdCancel = "" # 'echo "canceled"'
         self.cmdAccept = "" # 'echo "accepted {{i}}"'
         self.prompt = None # TODO: document special format; see _popuplist_screen..._buildPrompt
+        self.hasTitles = False # if true, items marked as titles will be treated specially when filtering
         self.initKeymaps()
 
 
@@ -217,9 +218,8 @@ class CList(object):
             cmd = self.expandVimCommand(cmd, curindex)
             rv = vim.eval(cmd)
             if rv == "q": return "quit"
-        except Exception as e:
-            vim.command("echom 'doVimCallback: %s'" % e)
-            pass
+        except vim.error:
+            vim.command("echom 'doVimCallback: vim.error caught'")
         return ""
 
     def redraw(self):
@@ -290,12 +290,27 @@ class CList(object):
             startat = 0
             inhead=[]; intail=[]
             for i in self.allitems:
+                if self.hasTitles and i.isTitle:
+                    intail.append(i)
+                    continue
                 text = i.filterText.lower()
                 good, bestpos = self.matchFilterWords(text, filt, startat)
                 if not good: continue
+                elif self.hasTitles: intail.append(i)
                 elif bestpos == startat and self.filtersort: inhead.append(i)
                 else: intail.append(i)
             self.__items = inhead + intail
+
+            if self.hasTitles:
+                ttlempty = []
+                prev = None
+                for k,i in enumerate(self.__items):
+                    if prev != None and prev.isTitle and i.isTitle: ttlempty.append(k-1)
+                    prev = i
+                if len(self.__items) > 0 and self.__items[-1].isTitle:
+                    self.__items.pop(-1)
+                ttlempty.reverse()
+                for k in ttlempty: self.__items.pop(k)
         pass
 
     def loadBufferItems(self, bufnum, minline = 0, maxline = -1):
@@ -321,6 +336,12 @@ class CList(object):
     def loadTestItems(self):
         self.allitems = [CListItem(i) for i in [u"one"*14, u"two"*13, u"three"*12, u"four"*11] * 10]
         self.refreshDisplay()
+
+    def setTitleItems(self, reSearch, noinvert=1):
+        rx = re.compile(reSearch)
+        for i in self.allitems:
+            if (rx.search(i._text) != None) == (noinvert != 0):
+                i.isTitle = True
 
     def getTrueIndex(self, filteredIndex):
         if self.__items != None: nitems = len(self.__items)

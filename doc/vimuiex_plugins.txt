@@ -1,4 +1,4 @@
-*vimuiex_plugins.txt*	 Vimuiex Plugins           Last Change: November 2009
+*vimuiex_plugins.txt*	 Vimuiex Plugins           Last Change: January 2010
 			*vimuiex-plugins*
 
 Commands that require "+python" and curses or the "+python_screen" patch:
@@ -22,14 +22,14 @@ Commands that require "+python_screen":
    VxLineJump			    |vimuiex-vxlinejump|
    VxWindowJump			    |vimuiex-vxwindowjump|
 
-Commands defined in VxLib:
+Plugins defined in VxLib:
 
    Preview for QuickFix window      |vxlib-quickfixpreview|
 
 ==============================================================================
-POPUP MENU NAVIGATOR				          *vimuiex-vxtextmenu*
+POPUP MENU NAVIGATOR				          *vimuiex-popupmenu*
 
-VxTextMenu
+VxTextMenu                                       *vimuiex-vxtextmenu*
 ----------
 
 Displays a list of top-level menus in a popup listbox. An item from the menu 
@@ -76,6 +76,8 @@ To start use: >
 OPEN RECENT FILE                                       *vimuiex-vxrecentfile*
 
 VxOpenRecentFile                                 *vimuiex-vxopenrecentfile*
+----------------
+
 Displays a list of recent files in an overlapping window. The filename is
 displayed in the first column and the directory in the second column. A file
 can be selected from the list as described in |vimuiex-operation|. When <CR>
@@ -187,6 +189,7 @@ To replace the default command K use: >
 
 VxDisplay					 *vimuiex-vxdisplay*
 ---------
+
 Displays the contents of the registers (output of the :display command) in a 
 popup listbox. If <CR> is pressed on a selected item, the contents of the 
 register is pasted into current buffer. If <@> is pressed on a selected item,
@@ -195,6 +198,7 @@ the contents of the register will be executed as a macro.
 
 VxMarks						 *vimuiex-vxmarks*
 -------
+
 Displays the marks (output of the :marks command) in a popup listbox. If <CR> 
 is pressed on a valid mark, the cursor jumps to that mark.
 
