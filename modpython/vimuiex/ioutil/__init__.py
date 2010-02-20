@@ -8,20 +8,23 @@ def __detectPlatform():
     try:
         import vim
         if vim.screen != None: return "vim.screen"
-    except: pass
+    except Exception as e:
+        print "Exception: %s" % e
     hasgui = int(vim.eval('has("gui_running")'))
     if hasgui != 0:
         try: # Deprecated: wx platform will be dropped!
             import wx
             return "wx"
-        except: pass
+        except Exception as e:
+            print "Exception: %s" % e
     else:
         try:
             import curses
             import gcurses
             gcurses.vimPrepareScreen()
             return "curses"
-        except: pass
+        except Exception as e:
+            print "Exception: %s" % e
     print "ioutil: Platform detection failed"
     return None
 

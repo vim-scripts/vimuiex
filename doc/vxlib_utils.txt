@@ -1,7 +1,16 @@
-*vxlib_hist.txt*          History Utilities          Last Change: October 2009
+*vxlib_utils.txt*          Utilities               Last Change: February 2010
+
+==============================================================================
+VXLIB UTILITIES						     *vxlib-utilities*
+
+   Multiple histories        |vxlib-history|
+   Python support            |vxlib-python|
 
 ==============================================================================
 HISTORY                                                        *vxlib-history*
+
+Multiple histories
+------------------
 
 Use multiple histories with |input()| command.
 
@@ -44,6 +53,46 @@ Initialization/Termination:
      will be saved to g:CUSTOM_HISTORIES before writing the viminfo file
    - if vxlib#hist# isn't used in a session, g:CUSTOM_HISTORIES remains 
      unchanged (if it was present in viminfo).
+
+
+==============================================================================
+PYTHON SUPPORT                                                 *vxlib-python*
+
+Prepare Python environment             *vxlib-python-prepare*
+--------------------------
+
+To keep all Python modules used by Vim in one place (eg. ~/.vim/modpython),
+the function vxlib#python#prepare() can be called from a script that imports
+Python modules. The function will search for a directory named "modpython" in
+the runtime path. It the directory is found, it will be added to Python
+sys.path, but only the first time the function is called.
+
+Example:
+>
+    call vxlib#python#prepare()
+    python << EOF
+    import my_vim_module   # my_vim_module.py installed in ~/.vim/modpython
+    ...
+    EOF
+<
+
+Call Vim functions from Python         *vxlib-python-callback*
+------------------------------
+
+If the Python code needs to call Vim functions that are local to a Vim script,
+there is a utility function vxlib#plugin#MakeSID() that will create two variables
+in the calling script: s:SID and s:SNR (s:SNR = '<SNR>' . s:SID). These
+variables can be used to define Vim callbacks for Python code.
+
+Example:
+>
+   exec vxlib#plugin#MakeSID()
+   function s:Message()
+      echom "Callback called"
+   endfunc
+   exec 'python vim.eval("' . s:SNR . 'Message()")'
+<
+
 
 
 ## vim:tw=78:noet:wrap:ts=8:ft=help:norl:

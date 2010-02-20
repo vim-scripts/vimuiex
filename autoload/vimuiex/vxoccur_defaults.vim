@@ -20,7 +20,7 @@ endfunc
 
 function! s:ReWords(words, delim)
    let w = split(a:words, a:delim)
-   return '\(' . join(w, '\)\|\(') . '\)'
+   return '\(' . join(w, '\|') . '\)'
 endfunc
 
 function! s:DefRoutines(ftype, regexp, call)
@@ -33,6 +33,12 @@ function! s:DefRoutines(ftype, regexp, call)
 endfunc
 
 call s:DefRoutines('html', '\c\(\(<h\d>\s*\S\+\)\|\(<div\s\+id=\)\)', '')
+call s:DefRoutines('apache',
+   \ '^\s*<' 
+   \     . s:ReWords('Directory\(Match\)\?|Files\(Match\)\?|Location\(Match\)\?|VirtualHost', '|')
+   \     . '\W'
+   \     . '\|^\s*' . '\(\(WSGI\)\?Script\)\?Alias\(Match\)\?' . '\W',
+   \ '')
 call s:DefRoutines('python', '^\s*\(' . s:ReWords('class def', ' ') . '\)\W', '')
 call s:DefRoutines('slice',
    \ '\(^\s*\(' . s:ReWords('class|interface|struct|enum|sequence|module', '|') . '\)\W\)', '')

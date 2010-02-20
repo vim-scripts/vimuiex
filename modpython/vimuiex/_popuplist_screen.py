@@ -128,6 +128,8 @@ class CPopupListbox(object):
         co = self.coNormal
         self.window.attrset(co)
         self.window.border()
+        # curses: without a refresh before drawItems, the first line is initially displayed wrong
+        self.window.refresh()
 
         if curindex == None: curindex = self.curindex
         self.setCurIndex(curindex, redraw = False)
@@ -158,9 +160,6 @@ class CPopupListbox(object):
             del w
         ioutil.CScreen().refresh()
         vim.command("redraw!")
-
-    def redraw(self):
-        self.show()
 
     def getLineStr(self, text, lineno):
         if text.find("\t") >= 0:

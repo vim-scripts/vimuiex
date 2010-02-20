@@ -4,7 +4,7 @@ import curses
 import vim
 import locale
 
-locale.setlocale(locale.LC_ALL, '')
+locale.setlocale(locale.LC_ALL, 'C')
 code = locale.getpreferredencoding()
 
 # The one and only curses screen
