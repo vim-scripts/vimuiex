@@ -88,12 +88,16 @@ endfunc
 " use the expression defined in FBrowse.callbackEditFile to construct
 " a callback and evaluate it. The internal command can accept one string
 " parameter (without quotes) which will be passed to vxlib#cmd#Edit.
-function! vimuiex#vxdired#VxFileBrowser()
+" @param mode:
+"     'browse' - show current directory, normal operation
+"     'filter' - show directory tree, filter mode
+function! vimuiex#vxdired#VxFileBrowser(mode)
    exec 'python def SNR(s): return s.replace("$SNR$", "' . s:SNR . '")'
 
 python << EOF
 import vim
 import vimuiex.dired as dired
+import vimuiex.popuplist as popuplist
 FBrowse = dired.CFileBrowser(optid="VxFileBrowser")
 FBrowse.exprRecentDirList = SNR("$SNR$GetRecentDirList_cb()")
 FBrowse.callbackEditFile = SNR("$SNR$OpenMarkedFiles_cb({{pwd}}, {{S}}, {{s}}, {{p}})")
@@ -106,7 +110,18 @@ FBrowse.keymapNorm.setKey(r"gt", "list:dired-select t")
 FBrowse.keymapNorm.setKey(r"gs", "list:dired-select s")
 FBrowse.keymapNorm.setKey(r"gv", "list:dired-select v")
 EOF
-   exec 'python FBrowse.process(curindex=0, cwd="' . s:GetStartupDir() . '")'
+   if a:mode == 'filter'
+      exec 'python FBrowse.subdirDepth=' . g:VxFileFilter_treeDepth
+      exec 'python FBrowse.deepListLimit=' . g:VxFileFilter_limitCount
+      exec 'python FBrowse.fileFilter.skipFiles("' . g:VxFileFilter_skipFiles . '")'
+      exec 'python FBrowse.fileFilter.skipDirs("' . g:VxFileFilter_skipDirs . '")'
+      exec 'python FBrowse.process(curindex=0, cwd="' . s:GetStartupDir() . '"' .
+               \ ', startmode=popuplist.CList.MODE_FILTER)'
+   else
+      exec 'python FBrowse.fileFilter.skipFiles("' . g:VxFileBrowser_skipFiles . '")'
+      exec 'python FBrowse.fileFilter.skipDirs("' . g:VxFileBrowser_skipDirs . '")'
+      exec 'python FBrowse.process(curindex=0, cwd="' . s:GetStartupDir() . '")'
+   endif
    python FBrowse=None
 
 endfunc
@@ -119,6 +134,12 @@ finish
 " <VIMPLUGIN id="vimuiex#vxdired" require="python&&(!gui_running||python_screen)">
    call s:CheckSetting('g:VxRecentFile_nocase', !has('fname_case'))
    call s:CheckSetting('g:VxRecentDir_size', 20)
+   call s:CheckSetting('g:VxFileFilter_treeDepth', 6)
+   call s:CheckSetting('g:VxFileFilter_skipFiles', "'*.pyc,*.o,*.*~,*.~*,.*.swp'")
+   call s:CheckSetting('g:VxFileFilter_skipDirs', "'.git,.svn'")
+   call s:CheckSetting('g:VxFileFilter_limitCount', 0)
+   call s:CheckSetting('g:VxFileBrowser_skipFiles', 'g:VxFileFilter_skipFiles')
+   call s:CheckSetting('g:VxFileBrowser_skipDirs', "''")
 
    function! s:VIMUIEX_dired_SaveHistory()
       let g:VXRECENTDIRS = join(g:VxPluginVar.vxrecentfile_dirs, "\n")
@@ -149,6 +170,7 @@ finish
       let g:VxPluginVar.vxrecentfile_dirs = split(g:VXRECENTDIRS, "\n")
    " </STARTUP>
 
-   command VxFileBrowser call vimuiex#vxdired#VxFileBrowser()
+   command VxFileBrowser call vimuiex#vxdired#VxFileBrowser('browse')
+   command VxFileFilter call vimuiex#vxdired#VxFileBrowser('filter')
 
 " </VIMPLUGIN>

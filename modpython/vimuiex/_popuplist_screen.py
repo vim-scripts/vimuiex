@@ -13,6 +13,7 @@ import time
 import vim
 import simplekeymap
 import ioutil
+from popuplist import CList
 
 def log(msg):
     f = open ("testlog.txt", "a")
@@ -90,7 +91,7 @@ class CPopupListbox(object):
         self.hoffset = 0
         self.curindex = 0
         self.exitcommand = ""
-        self.keyboardMode = CPopupListbox.NORMAL
+        self.keyboardMode = CList.MODE_NORMAL
         self.quickChar = None # Currently active quick char
         self.numselect = CNumSelect()
         self.numselect.setMaxNumber(self.lastline)
@@ -161,6 +162,9 @@ class CPopupListbox(object):
         ioutil.CScreen().refresh()
         vim.command("redraw!")
 
+    def redraw(self):
+        self.show()
+
     def getLineStr(self, text, lineno):
         if text.find("\t") >= 0:
             cw = self.itemlist.getFirstColumnWidth()
@@ -175,7 +179,7 @@ class CPopupListbox(object):
             w -= 2
             line = u"< %*s" % (-w, text[self.hoffset:self.hoffset+w])
         else:
-            if self.keyboardMode == CPopupListbox.NUMSELECT:
+            if self.keyboardMode == CList.MODE_NUMSELECT:
                 w -= (self.numselect.width + 1)
                 lnstr = self.numselect.format % lineno
                 line = u"%s %*s" % (lnstr, -w, text[self.hoffset:self.hoffset+w])
@@ -193,8 +197,8 @@ class CPopupListbox(object):
         y = 0
         top = self.topindex
         items = self.itemlist.items
-        hasQuick = self.keyboardMode == CPopupListbox.QUICK and self.hoffset == 0
-        hasNumSelect = self.keyboardMode == CPopupListbox.NUMSELECT
+        hasQuick = self.hoffset == 0 and self.keyboardMode == CList.MODE_QUICK
+        hasNumSelect = self.keyboardMode == CList.MODE_NUMSELECT
         win = self.wcontent
         win.move(0, 0)
         # win.scrollok(False) # no effect, fails with addstr on last line
@@ -236,20 +240,22 @@ class CPopupListbox(object):
         self.window.addstr(self.height - 1, x, ptxt, co)
 
     def _drawFilter(self):
-        if self.keyboardMode == CPopupListbox.FILTER or self.itemlist.strFilter != "":
+        if self.itemlist.strFilter != "" or self.keyboardMode == CList.MODE_FILTER:
             mtw = self.width - 6
+            if mtw > 10: fieldw = 10
+            else: fieldw = mtw
             s = self.itemlist.strFilter
             if len(s) > mtw: s = "/...%s" % s[-(mtw-3):]
-            else: s = "/%s" % s
-            if self.keyboardMode == CPopupListbox.NUMSELECT: s = ("#%s " % self.numselect.curNumber) + s
-            if self.keyboardMode == CPopupListbox.QUICK: s = "&& " + s
+            else: s = "/%*s" % (-fieldw+1, s)
+            if self.keyboardMode == CList.MODE_NUMSELECT: s = ("#%s " % self.numselect.curNumber) + s
+            if self.keyboardMode == CList.MODE_QUICK: s = "&& " + s
             if len(s) > mtw: s = s[-(mtw-3):]
-            if self.keyboardMode == CPopupListbox.FILTER: co = self.coSelected
+            if self.keyboardMode == CList.MODE_FILTER: co = self.coSelected
             else: co = self.coNormal
             self.window.addstr(self.height - 1, 2, s, co)
-        elif self.keyboardMode == CPopupListbox.QUICK:
+        elif self.keyboardMode == CList.MODE_QUICK:
             self.window.addstr(self.height - 1, 2, "&&", self.coSelected)
-        elif self.keyboardMode == CPopupListbox.NUMSELECT:
+        elif self.keyboardMode == CList.MODE_NUMSELECT:
             self.window.addstr(self.height - 1, 2, "#%s" % self.numselect.curNumber, self.coSelected)
 
     def drawLastLine(self): # status
@@ -286,6 +292,16 @@ class CPopupListbox(object):
     def offsetCurIndex(self, offset):
         self.setCurIndex(self.curindex + offset)
 
+    def getCurrentItem(self):
+        if self.curindex < 0 or self.curindex >= len(self.itemlist.items): return None
+        return self.itemlist.items[self.curindex]
+
+    def setCurrentItem(self, item):
+        try:
+            ci = self.itemlist.items.index(item)
+            self.setCurIndex(ci)
+        except ValueError: pass
+
     # horizontal offset
     def offsetDisplay(self, offset):
         off = self.width / 2
@@ -312,27 +328,27 @@ class CPopupListbox(object):
             self.keyboardMode = CPopupListbox.EXIT
             self.exitcommand = (cmd, self.curindex)
         elif cmd == "quickchar":
-            self.keyboardMode = CPopupListbox.QUICK
+            self.keyboardMode = CList.MODE_QUICK
         elif cmd == "exit-quickchar":
-            self.keyboardMode = CPopupListbox.NORMAL
+            self.keyboardMode = CList.MODE_NORMAL
         elif cmd == "filter":
-            self.keyboardMode = CPopupListbox.FILTER
+            self.keyboardMode = CList.MODE_FILTER
         elif cmd == "filter-accept":
-            self.keyboardMode = CPopupListbox.NORMAL
+            self.keyboardMode = CList.MODE_NORMAL
         elif cmd == "filter-next":
             self.offsetCurIndex(1)
-            self.keyboardMode = CPopupListbox.NORMAL
+            self.keyboardMode = CList.MODE_NORMAL
         elif cmd == "filter-prev":
             self.offsetCurIndex(-1)
-            self.keyboardMode = CPopupListbox.NORMAL
+            self.keyboardMode = CList.MODE_NORMAL
         elif cmd == "filter-cancel":
-            self.keyboardMode = CPopupListbox.NORMAL
+            self.keyboardMode = CList.MODE_NORMAL
             self.itemlist.setFilter("")
             self.setCurIndex(self.curindex) # fix the index and redraw items
             self.drawLastLine()
         elif cmd == "filter-delete":
             l = len(self.itemlist.strFilter)
-            if l < 1: self.keyboardMode = CPopupListbox.NORMAL
+            if l < 1: self.keyboardMode = CList.MODE_NORMAL
             else:
                 self.itemlist.setFilter(self.itemlist.strFilter[:l-1])
                 self.setCurIndex(self.curindex) # fix the index and redraw items
@@ -342,7 +358,7 @@ class CPopupListbox(object):
             self.setCurIndex(0)
             self.drawLastLine()
         elif cmd == "numselect":
-            self.keyboardMode = CPopupListbox.NUMSELECT
+            self.keyboardMode = CList.MODE_NUMSELECT
             self.numselect.curNumber = ""
             self.drawLastLine()
         elif cmd == "numselect-delete":
@@ -357,8 +373,8 @@ class CPopupListbox(object):
                 # TODO: Redraw only current item on togglemarked
         pass
 
-    # if CList.prompt starts with \r, process further, oterwise return unprocessed
-    # processing:
+    # If CList.prompt starts with \r, process further, oterwise return unprocessed.
+    # Processing:
     #    replace {{mode}} with current lb keyborard mode
     #    replace {{extra}} with itemlist.getExtraPrompt
     def _buildPrompt(self):
@@ -368,10 +384,10 @@ class CPopupListbox(object):
         prompt = prompt.lstrip()
         if prompt.find("{{") < 0: return prompt
         mode = self.keyboardMode
-        if mode == CPopupListbox.NORMAL: p2 = ""
-        elif mode == CPopupListbox.FILTER: p2 = ".Filter"
-        elif mode == CPopupListbox.QUICK: p2 = ".QuickChar"
-        elif mode == CPopupListbox.NUMSELECT: p2 = ".NumSelect"
+        if mode == CList.MODE_NORMAL: p2 = ""
+        elif mode == CList.MODE_FILTER: p2 = ".Filter"
+        elif mode == CList.MODE_QUICK: p2 = ".QuickChar"
+        elif mode == CList.MODE_NUMSELECT: p2 = ".NumSelect"
         else: p2 = ""
         prompt = prompt.replace("{{mode}}", p2)
         mw = int(vim.eval("&columns")) - 2 - len(prompt)
@@ -456,16 +472,16 @@ class CPopupListbox(object):
                 self.setCurIndex(newi)
                 self.drawLastLine()
             else:
-                self.keyboardMode = CPopupListbox.NORMAL
+                self.keyboardMode = CList.MODE_NORMAL
             if self.numselect.isComplete():
-                self.keyboardMode = CPopupListbox.NORMAL
+                self.keyboardMode = CList.MODE_NORMAL
         pass
 
-    def process(self, curindex=0, startmode=1): # TODO: startmode=sth.NORMAL
+    def process(self, curindex=0, startmode=CList.MODE_NORMAL):
         self.keyboardMode = startmode
         km = self.itemlist.keymapNorm
-        if self.keyboardMode == CPopupListbox.FILTER: km = self.itemlist.keymapFilter
-        elif self.keyboardMode == CPopupListbox.QUICK: km = self.itemlist.keymapQuickChar
+        if self.keyboardMode == CList.MODE_FILTER: km = self.itemlist.keymapFilter
+        elif self.keyboardMode == CList.MODE_QUICK: km = self.itemlist.keymapQuickChar
         else: km = self.itemlist.keymapNorm
         self._prepareScreen()
         self.show(curindex)
@@ -473,6 +489,9 @@ class CPopupListbox(object):
         self.exitcommand = None
         keyseq = ""
         while self.keyboardMode != CPopupListbox.EXIT:
+            curitem = self.getCurrentItem()
+            if self.itemlist.checkPendingItems():
+                if curitem != None: self.setCurrentItem(curitem)
             self.refresh()
             oldmode = self.keyboardMode
             ch = self._vim_getkey()
@@ -487,15 +506,15 @@ class CPopupListbox(object):
 
             if oldmode != self.keyboardMode:
                 if self.keyboardMode == CPopupListbox.EXIT: break
-                elif self.keyboardMode == CPopupListbox.NORMAL:
+                elif self.keyboardMode == CList.MODE_NORMAL:
                     km = self.itemlist.keymapNorm
-                elif self.keyboardMode == CPopupListbox.FILTER:
+                elif self.keyboardMode == CList.MODE_FILTER:
                     km = self.itemlist.keymapFilter
-                elif self.keyboardMode == CPopupListbox.QUICK:
+                elif self.keyboardMode == CList.MODE_QUICK:
                     km = self.itemlist.keymapQuickChar
-                elif self.keyboardMode == CPopupListbox.NUMSELECT:
+                elif self.keyboardMode == CList.MODE_NUMSELECT:
                     km = self.itemlist.keymapNumSelect
-                if oldmode == CPopupListbox.QUICK:
+                if oldmode == CList.MODE_QUICK:
                     self.resetQuickChar()
                 self.drawTitle()
                 self.drawItems()

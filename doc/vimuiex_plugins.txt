@@ -140,19 +140,65 @@ selected directory will be displayed in the file list.
 If 'e' is pressed the user is prompted for the name of a (new) file to be
 open in the currently displayed directory.
 
+					      *vimuiex-vxfilebrowser-deeplist*
 Files from subdirectories of the current directory can be displayed in a
 single list. To increase the number of subdirectory levels to be displayed
 press <C-L>. To decrease press <C-H> and to cancel subdirectory display press
-<C-K>. The number of files displayed in the list is limited to approx. 1000
-items. When the limit is reached, no new subdirectories are added to the list.
-When the filter is active, only the matching files are counted so more
-subdirectories are processed. The filesystem is re-read after every filter
-change and may take a lot of time, depending on the number of files processed.
+<C-K>. The filesystem is read in a background thread while the list is already
+displayed. When a key is pressed, the pending files read by the reader thread
+are added to the list. When the number of subdirectory levels is changed, the
+contents of the list is cleared an the reading thread is restarted.
+
 
 The keysequence 'oa' will toggle the visibility of file attributes.
 
+
+Settings                                      *vimuiex-vxfilebrowser-settings*
+
+The list of files and directories to skip while reading the filesystem can
+be defined in a comma-separated list: >
+   let g:VxFileBrowser_skipFiles = '*.pyc,*.o,*.*~,*.~*,.*.swp'
+   let g:VxFileBrowser_skipDirs = '.git,.svn'
+<
 The size of the recent directory list can be changed with: >
    let g:VxRecentDir_size = 20
+<
+
+VxFileFilter                                  *vimuiex-vxfilefilter*
+-------------
+
+Displays a list of files under the current directory up to a certain depth.
+It may take some time to scan the filesystem with many files. The initial list
+is displayed after the first 300 files are added. The subsequent files are
+read in a background thread and the list is updated after every keypress
+untill all the files are added. The listbox starts up in filtering mode. The
+operation is exactly the same as in vxfilebrowser.
+
+Filtering a large list of file items may be slow. To speed things up, the
+filter is applied only to the already dispayed list, if the new value of
+the filter string is longer than the previous one. When a character is
+deleted from the filter string, all items are refiltered.
+
+A large list of files may consume a lot of memory (approx. 800 bytes per item!
+that is 40MB for 50k files). If the computer doesn't have enough memory,
+g:VxFileFilter_limitCount should be set (see below). The filesystem is
+processed in breadth-first-search order, so at least the files from the
+higher directory levels should be processed before the limit applies.
+
+
+Settings                                      *vimuiex-vxfilefilter-settings*
+
+The list of files and directories to skip while reading the filesystem can
+be defined in a comma-separated list: >
+   let g:VxFileFilter_skipFiles = '*.pyc,*.o,*.*~,*.~*,.*.swp'
+   let g:VxFileFilter_skipDirs = '.git,.svn'
+<
+The number of subdirectory levels that are processed can be changed with: >
+   let g:VxFileFilter_treeDepth = 6
+<
+The number of files displayed can be limited by setting the following variable
+to a value greater than 0 (0 means no limit): >
+   let g:VxFileFilter_limitCount = 50000
 <
 
 ==============================================================================

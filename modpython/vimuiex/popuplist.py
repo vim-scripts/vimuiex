@@ -8,10 +8,12 @@
 # This program comes with ABSOLUTELY NO WARRANTY.
 
 import re, time
+import threading
 import vim
 import simplekeymap
 import ioutil
 import boxposition
+import textfilter
 
 # TODO: vimuiex init script when the list is used for the first time: copy vars from vim to python
 # import the correct listbox implementation
@@ -65,6 +67,10 @@ class CListItem(object):
 # TODO: add default search mode for /: i-search or filter
 # TODO: implement multiline list items (eg. up to 3 lines)
 class CList(object):
+    MODE_NORMAL = 1
+    MODE_FILTER = 2
+    MODE_QUICK = 3
+    MODE_NUMSELECT = 4
     def __init__(self, title="", optid=""):
         """
         position: (x, y); if None, center the listbox
@@ -91,9 +97,11 @@ class CList(object):
         self.maxColumnWidth = 0.3
         self.allitems = []
         self.strFilter = "" 
-        self.filterWordSeparator = ","
+        self._filter = textfilter.CWordFilter()
         self.__items = None     # Displayed (filtered) items; delayed creation in items()
         self.__listbox = None   # Listbox implementation
+        self._pendingItemsLock = threading.Lock() # items added incrementally
+        self._pendingItems = None
         self.sort = True        # sort input list
         self.filtersort = True  # sort filtered data (quickchar, startswith, contains)
         self.keymapNorm = simplekeymap.CSimpleKeymap()
@@ -225,8 +233,13 @@ class CList(object):
     def redraw(self):
         if self.__listbox != None: self.__listbox.redraw()
 
-    def refreshDisplay(self):
+    def restartFilter(self, full=False):
+        if full: self.__previtems = None
+        else: self.__previtems = self.__items
         self.__items = None
+
+    def refreshDisplay(self):
+        self.restartFilter()
         self._firstColumnWidth = None
         if self.__listbox != None: self.__listbox.refreshDisplay()
 
@@ -237,6 +250,7 @@ class CList(object):
         if strFilter == self.strFilter: return
         old = self.strFilter
         self.strFilter = strFilter
+        self._filter.setFilter(self.strFilter)
         self.onFilterChanged(old, strFilter)
         if self._resizeOnFilter: self.relayout(size=True)
         self.refreshDisplay()
@@ -256,61 +270,41 @@ class CList(object):
         if self.__items == None: self.__applyFilter()
         return len(self.__items)
 
-    # returns a list of tuples: (word, negated?)
-    def getFilterWords(self):
-        if self.filterWordSeparator == "": sep = " "
-        else: sep = self.filterWordSeparator
-        filt = self.strFilter.lower().split(sep)
-        filt = [ f.strip() for f in filt if f.strip() != "" ]
-        filt = [ (f.lstrip("-"), f.startswith("-")) for f in filt if f.lstrip("-") != ""]
-        return filt
-
-    # @param words a list of tuples: (word, negated?)
-    # @returns a tuple (trueIfAllMatched, positiveMatchPosition)
-    def matchFilterWords(self, text, words, startat=0):
-        good = True; bestpos = -1
-        for f in words:
-            pos = text.find(f[0], startat)
-            if (pos >= 0 and f[1]) or (pos < 0 and not f[1]):
-                good = False
-                break
-            if bestpos < 0 and not f[1] and pos >= 0: bestpos = pos
-        return (good, bestpos)
-
     def __applyFilter(self):
-        addAll = False
-        if self.strFilter == None or self.strFilter == "":
-            addAll = True
-        else:
-            filt = self.getFilterWords()
-            if len(filt) < 1: addAll = True
+        if self._filter.isEmpty():
+            self.__previtems = None
+            self.__items = [i for i in self.allitems]
+            return
 
-        if addAll: self.__items = [i for i in self.allitems]
-        else:
-            startat = 0
-            inhead=[]; intail=[]
-            for i in self.allitems:
-                if self.hasTitles and i.isTitle:
-                    intail.append(i)
-                    continue
-                text = i.filterText.lower()
-                good, bestpos = self.matchFilterWords(text, filt, startat)
-                if not good: continue
-                elif self.hasTitles: intail.append(i)
-                elif bestpos == startat and self.filtersort: inhead.append(i)
-                else: intail.append(i)
-            self.__items = inhead + intail
+        # incremental filtering
+        allitems = self.allitems
+        if self._filter.filterGrown and self.__previtems != None:
+            allitems = self.__previtems
+        self.__previtems = None
 
-            if self.hasTitles:
-                ttlempty = []
-                prev = None
-                for k,i in enumerate(self.__items):
-                    if prev != None and prev.isTitle and i.isTitle: ttlempty.append(k-1)
-                    prev = i
-                if len(self.__items) > 0 and self.__items[-1].isTitle:
-                    self.__items.pop(-1)
-                ttlempty.reverse()
-                for k in ttlempty: self.__items.pop(k)
+        startat = 0
+        inhead=[]; intail=[]
+        for i in allitems:
+            if self.hasTitles and i.isTitle:
+                intail.append(i)
+                continue
+            good, bestpos = self._filter.match(i.filterText, startat)
+            if good < 1: continue
+            elif self.hasTitles: intail.append(i)
+            elif bestpos == startat and self.filtersort: inhead.append(i)
+            else: intail.append(i)
+        self.__items = inhead + intail
+
+        if self.hasTitles:
+            ttlempty = []
+            prev = None
+            for k,i in enumerate(self.__items):
+                if prev != None and prev.isTitle and i.isTitle: ttlempty.append(k-1)
+                prev = i
+            if len(self.__items) > 0 and self.__items[-1].isTitle:
+                self.__items.pop(-1)
+            ttlempty.reverse()
+            for k in ttlempty: self.__items.pop(k)
         pass
 
     def loadBufferItems(self, bufnum, minline = 0, maxline = -1):
@@ -340,7 +334,7 @@ class CList(object):
     def setTitleItems(self, reSearch, noinvert=1):
         rx = re.compile(reSearch)
         for i in self.allitems:
-            if (rx.search(i._text) != None) == (noinvert != 0):
+            if (rx.search(i._text) != None) == (noinvert != 0): # TODO: shouldn't use _text
                 i.isTitle = True
 
     def getTrueIndex(self, filteredIndex):
@@ -427,7 +421,33 @@ class CList(object):
         if self.__listbox != None:
             self.__listbox.relayout(self.position, self.size)
 
-    def process(self, curindex = 0, startmode = 1): # TODO: startmode=sth.NORMAL
+    # Check if any items were added to the list while the list is being displayed.
+    # This function enables adding items to the list incrementally.
+    def checkPendingItems(self):
+        if self._pendingItems == None: return False
+        if len(self._pendingItems) < 1: return False
+        self._pendingItemsLock.acquire()
+        merged = False
+        try:
+            if self._pendingItems != None: # re-check
+                merged = True
+                self.allitems = self.mergeItems(self.allitems, self._pendingItems)
+                self._pendingItems = None
+                self.restartFilter(full=True) # reapply filter
+                self.relayout()
+        finally:
+            self._pendingItemsLock.release()
+        return merged
+
+    # To be overridden if necessary
+    def mergeItems(self, current, newlist):
+        current += newlist
+        return current
+
+    def onExit(self):
+        pass
+
+    def process(self, curindex = 0, startmode = MODE_NORMAL): # TODO: startmode=sth.NORMAL
         lbimpl = importListboxImpl()
         if lbimpl == None: return
         self.relayout()
@@ -447,4 +467,5 @@ class CList(object):
                 elif type(cmd) == type("") and cmd != "":
                     cmd = self.expandVimCommand(cmd, idx)
                     vim.eval(cmd)
+        self.onExit()
 

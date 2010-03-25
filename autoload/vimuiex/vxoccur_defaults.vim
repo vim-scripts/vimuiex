@@ -20,7 +20,7 @@ endfunc
 
 function! s:ReWords(words, delim)
    let w = split(a:words, a:delim)
-   return '\(' . join(w, '\|') . '\)'
+   return '\%(' . join(w, '\|') . '\)'
 endfunc
 
 function! s:DefRoutines(ftype, regexp, call)
@@ -32,18 +32,38 @@ function! s:DefRoutines(ftype, regexp, call)
    endif
 endfunc
 
-call s:DefRoutines('html', '\c\(\(<h\d>\s*\S\+\)\|\(<div\s\+id=\)\)', '')
+call s:DefRoutines('html', '\c\%(\%(<h\d>\s*\S\+\)\|\%(<div\s\+id=\)\)', '')
 call s:DefRoutines('apache',
    \ '^\s*<' 
-   \     . s:ReWords('Directory\(Match\)\?|Files\(Match\)\?|Location\(Match\)\?|VirtualHost', '|')
+   \     . s:ReWords('Directory\%(Match\)\?|Files\%(Match\)\?|Location\%(Match\)\?|VirtualHost', '|')
    \     . '\W'
-   \     . '\|^\s*' . '\(\(WSGI\)\?Script\)\?Alias\(Match\)\?' . '\W',
+   \     . '\|^\s*' . '\(\%(WSGI\)\?Script\)\?Alias\%(Match\)\?' . '\W',
    \ '')
-call s:DefRoutines('python', '^\s*\(' . s:ReWords('class def', ' ') . '\)\W', '')
+call s:DefRoutines('python', '^\s*' . s:ReWords('class def', ' ') . '\W', '')
 call s:DefRoutines('slice',
-   \ '\(^\s*\(' . s:ReWords('class|interface|struct|enum|sequence|module', '|') . '\)\W\)', '')
+   \ '\(^\s*' . s:ReWords('class|interface|struct|enum|sequence|module', '|') . '\W\)', '')
 call s:DefRoutines('vim', '\(^\s*\(s:\)\?' . s:ReWords('func|function', '|') . '!\?\W\)', '')
 call s:DefRoutines('xhtml', g:vxoccur_routine_def['html'], '')
+
+
+"================================================================= 
+" LATEX
+"================================================================= 
+call s:DefRoutines('tex', '^\s*\\\%(title\|\%(sub\)*section\){', 'vimuiex#vxoccur_defaults#ExtractLatex')
+function! vimuiex#vxoccur_defaults#ExtractLatex()
+   let ln = getline('.')
+   if match(ln, '^\s*\\title{') >= 0
+      let text = matchstr(ln, '^\s*\\title{\s*\zs[^}]*\ze')
+   elseif match(ln, '^\s*\\\%(sub\)*section{') >= 0
+      let level_text = substitute(ln, '^\s*\\\(\%(sub\)*\)section{\s*\([^}]*\).*$', '\1}\2', '')
+      let [level, text] = split(level_text, '}', 1)
+      let ll = len(level) / 3
+      let text = printf('%*s%s', ll, '', text)
+   else 
+      let text = '?'
+   endif
+   return text
+endfunc
 
 "================================================================= 
 " BIBTEX
@@ -95,3 +115,12 @@ endfunc
 " Cleanup
 delfunc s:ReWords
 delfunc s:DefRoutines
+
+" =========================================================================== 
+" Global Initialization - Processed by Plugin Code Generator
+" =========================================================================== 
+finish
+
+" <FTPLUGIN id="vxoccur#routine-defaults" filetype="html,xthml,tex,bib,vim,python,slice,apache">
+   call vimuiex#vxoccur_defaults#Init()
+" </FTPLUGIN>
