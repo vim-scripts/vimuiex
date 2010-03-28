@@ -113,14 +113,14 @@ EOF
    if a:mode == 'filter'
       exec 'python FBrowse.subdirDepth=' . g:VxFileFilter_treeDepth
       exec 'python FBrowse.deepListLimit=' . g:VxFileFilter_limitCount
-      exec 'python FBrowse.fileFilter.skipFiles("' . g:VxFileFilter_skipFiles . '")'
-      exec 'python FBrowse.fileFilter.skipDirs("' . g:VxFileFilter_skipDirs . '")'
-      exec 'python FBrowse.process(curindex=0, cwd="' . s:GetStartupDir() . '"' .
+      exec 'python FBrowse.fileFilter.skipFiles("' . escape(g:VxFileFilter_skipFiles, '\"') . '")'
+      exec 'python FBrowse.fileFilter.skipDirs("' . escape(g:VxFileFilter_skipDirs, '\"') . '")'
+      exec 'python FBrowse.process(curindex=0, cwd="' . escape(s:GetStartupDir(), ' \"') . '"' .
                \ ', startmode=popuplist.CList.MODE_FILTER)'
    else
-      exec 'python FBrowse.fileFilter.skipFiles("' . g:VxFileBrowser_skipFiles . '")'
-      exec 'python FBrowse.fileFilter.skipDirs("' . g:VxFileBrowser_skipDirs . '")'
-      exec 'python FBrowse.process(curindex=0, cwd="' . s:GetStartupDir() . '")'
+      exec 'python FBrowse.fileFilter.skipFiles("' . escape(g:VxFileBrowser_skipFiles, '\"') . '")'
+      exec 'python FBrowse.fileFilter.skipDirs("' . escape(g:VxFileBrowser_skipDirs, '\"') . '")'
+      exec 'python FBrowse.process(curindex=0, cwd="' . escape(s:GetStartupDir(), ' \"') . '")'
    endif
    python FBrowse=None
 

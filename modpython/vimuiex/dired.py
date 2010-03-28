@@ -13,6 +13,20 @@ import vim
 import simplekeymap
 from popuplist import CList, CListItem
 
+def merge(left, right):
+    result = []
+    i, j = 0, 0
+    while i < len(left) and j < len(right):
+        if left[i].filterText <= right[j].filterText:
+            result.append(left[i])
+            i += 1
+        else:
+            result.append(right[j])
+            j += 1
+    result += left[i:]
+    result += right[j:]
+    return result
+
 class CFileFilter:
     def __init__(self):
         self._skipDirs = []
@@ -51,13 +65,13 @@ class CFileFilter:
         return True
 
 class CTreeListerThread(threading.Thread):
-    def __init__(self, sink, path, root=None, depth=5, fileFilter=None, listDirs=False, batchSize=300):
+    def __init__(self, sink, path, root=None, depth=5, fileFilter=None, listDirsDepth=1, batchSize=300):
         threading.Thread.__init__(self, name="TreeListerThread")
         self.sink = sink # The object that will recieve files through addFiles()
         self.path = path
         self.root = root
         self.depth = depth
-        self.listDirs = listDirs
+        self.listDirsDepth = listDirsDepth
         self.batch = batchSize
         self.isRunning = False
         self.fileFilter = fileFilter
@@ -68,13 +82,15 @@ class CTreeListerThread(threading.Thread):
         sink = self.sink
         root = self.root
         if root == None: root = self.path
-        tocheck = [(self.depth, self.path)]
+        tocheck = [(0, self.path)]
         fileFilter = self.fileFilter
         if fileFilter == None: fileFilter = CFileFilter()
         while self.isRunning and len(tocheck) > 0:
             depth, path = tocheck[0]
             tocheck = tocheck[1:]
             rpath = os.path.relpath(path, root)
+            if root.endswith(":\\") and rpath.startswith("..\\"): # windows stupidity
+                rpath = rpath[1:]
             try: lst = os.listdir(path)
             except: lst = []
             for f in lst:
@@ -86,8 +102,8 @@ class CTreeListerThread(threading.Thread):
                 except: continue
                 if stat.S_ISDIR(mode):
                     if not fileFilter.dirAccepted(f): continue
-                    if self.listDirs: dirs.append( (rpath, f) )
-                    if depth > 0: tocheck.append( (depth-1, pathname) )
+                    if depth < self.listDirsDepth: dirs.append( (rpath, f) )
+                    if depth < self.depth: tocheck.append( (depth+1, pathname) )
                 elif stat.S_ISREG(mode):
                     if not fileFilter.fileAccepted(f): continue
                     files.append( (rpath, f) )
@@ -110,6 +126,7 @@ class CTreeListerThread(threading.Thread):
 
 
 class CFileItem(CListItem):
+    __slots__ = ('owner', 'path', '_ftype', 'attrs')
     def __init__(self, owner, path, fname, attrs=""):
         CListItem.__init__(self, fname)
         self.owner = owner
@@ -132,6 +149,7 @@ class CFileItem(CListItem):
 
 
 class CDirectoryItem(CFileItem):
+    __slots__ = ()
     def __init__(self, owner, path, fname, attrs=""):
         CFileItem.__init__(self, owner, path, fname, attrs)
         self._ftype = 'd'
@@ -160,6 +178,11 @@ class CFileBrowser(CList):
         self.__filesAdded = False # files added in addFiles (eg. by CTreeListerThread)
         self.__listerThread = None
 
+    def hasBackgroundTasks(self):
+        try:
+            return self.__listerThread != None and self.__listerThread.is_alive()
+        except: return False
+
     def getTitle(self, maxwidth):
         if self.subdirDepth < 1: return CList.getTitle(self, maxwidth)
         t = "%s [+%d]" % (self.title, self.subdirDepth)
@@ -170,27 +193,9 @@ class CFileBrowser(CList):
         else: dots = ""
         return dots + t[-maxwidth:]
 
-    #@property
-    #def _hideFilterMasks(self):
-    #    if self._masks_hide == None:
-    #        self._masks_hide = []
-    #        for mask in self.filterHide.split(","):
-    #            mask = mask.replace(".", r"\.").replace("*", ".*").replace("?", ".")
-    #            try:
-    #                mask = re.compile(mask + "$", re.IGNORECASE)
-    #                self._masks_hide.append(mask)
-    #            except: pass
-    #    return self._masks_hide
-
     @property
     def _attributesVisible(self):
         return self.optShowAttrs and self.subdirDepth == 0
-
-    #def _isHidden(self, fname):
-    #    for mask in self._hideFilterMasks:
-    #        mo = mask.match(fname)
-    #        if mo != None: return True
-    #    return False
 
     def hrsize(self, size):
         grps = ['B', 'K', 'M', 'G', 'T']
@@ -221,7 +226,7 @@ class CFileBrowser(CList):
                 if os.access(pathname, os.W_OK): modW = "w"
                 else: modW="-"
             except: continue
-            fname = f.decode(self.osencoding, "replace")
+            fname = f # .decode(self.osencoding, "replace")
             if stat.S_ISDIR(mode):
                 if not self.fileFilter.dirAccepted(fname): continue
                 attrs = "%s %s %s%s" % ("     ", time.strftime("%Y-%m-%d %H:%M", mtime), modR, modW)
@@ -239,51 +244,22 @@ class CFileBrowser(CList):
         if not self._filter.filterGrown: self.loadDirectory(self.currentPath)
         self.relayout()
 
-    #def listtree_bfs(self, path, root=None, depth=0, listDirs=False):
-    #    files = []
-    #    if root == None: root = path
-    #    tocheck = [(depth, path)]
-    #    while len(tocheck) > 0:
-    #        depth, path = tocheck[0]
-    #        tocheck = tocheck[1:]
-    #        for f in os.listdir(path):
-    #            pathname = os.path.join(path, f)
-    #            try:
-    #                fst = os.stat(pathname)
-    #                mode = fst.st_mode
-    #            except: continue
-    #            if self._isHidden(f): continue
-    #            fname = os.path.relpath(pathname, root)
-    #            fname = fname.decode(self.osencoding, "replace")
-    #            if stat.S_ISDIR(mode):
-    #                # TODO: configurable: list directories or not
-    #                if listDirs:
-    #                    good, pos = self._filter.match(fname.lower())
-    #                    if good > 0: files.append([fname, CDirectoryItem(self, fname)])
-    #                if depth > 0 and len(files) < 5000: # TODO: user configurable limit on # of files
-    #                    tocheck.append( (depth-1, pathname) )
-    #            elif stat.S_ISREG(mode):
-    #                good, pos = self._filter.match(fname.lower())
-    #                if good > 0: files.append([fname, CFileItem(self, fname)])
-    #            else: pass
-    #    return files
-
     # called by CTreeListerThread
     def addFiles(self, files, dirs):
         readMore = True
-        self._pendingItemsLock.acquire()
+        newitems = []
+        for path,f in files:
+            # fname = f.decode(self.osencoding, "replace")
+            newitems.append( CFileItem(self, path, f) )
+        for path,f in dirs:
+            # fname = f.decode(self.osencoding, "replace")
+            newitems.append( CDirectoryItem(self, path, f) )
+
         try:
-            if self._pendingItems == None: self._pendingItems = []
-            for path,f in files:
-                fname = f.decode(self.osencoding, "replace")
-                #good, pos = self._filter.match(fname.lower())
-                #if good > 0: self._pendingItems.append( CFileItem(self, fname) )
-                self._pendingItems.append( CFileItem(self, path, fname) )
-            for path,f in dirs:
-                fname = f.decode(self.osencoding, "replace")
-                #good, pos = self._filter.match(fname.lower())
-                #if good > 0: self._pendingItems.append( CDirectoryItem(self, fname) )
-                self._pendingItems.append( CDirectoryItem(self, path, fname) )
+            self._pendingItemsLock.acquire()
+            if self._pendingItems == None: self._pendingItems = newitems
+            else: self._pendingItems += newitems
+
             if self.subdirDepth > 0 and self.deepListLimit > 0:
                 if len(self._pendingItems) + len(self.allitems) > self.deepListLimit:
                     readMore = False
@@ -295,7 +271,7 @@ class CFileBrowser(CList):
 
     def mergeItems(self, current, newlist):
         newlist.sort(key=lambda x: x.filterText)
-        current += newlist # TODO: merge sorted lists
+        current = merge(current, newlist)
         return current
 
     def getExtraPrompt(self, maxwidth=30):
@@ -305,6 +281,7 @@ class CFileBrowser(CList):
         else: return "...%s" % self.currentPath[-(maxwidth-3):]
 
     def loadDirectory(self, path):
+        #TODO: verify that path is unicode!
         if self.__listerThread != None:
             self.__listerThread.stop()
             self.__listerThread = None
@@ -319,11 +296,6 @@ class CFileBrowser(CList):
             for fn in dirs: self.allitems.append(fn[1])
             for fn in files: self.allitems.append(fn[1])
         else:
-            #   XXX: Old: read all files, then display
-            #files = self.listtree_bfs(path, path, self.subdirDepth)
-            #files.sort()
-            #for fn in files: self.allitems.append(fn[1])
-            #   XXX: Experimetal: list files in separate therad
             #   TODO: while the path&depth is the same, __listerThread should be running.
             #   The files read should be cached in memory in raw form (less space),
             #   except the hidden ones which should be skipped.
@@ -335,12 +307,13 @@ class CFileBrowser(CList):
             self.__listerThread = CTreeListerThread(self, path, path,
                     depth=self.subdirDepth, fileFilter=self.fileFilter)
             self.__listerThread.start()
-            while not self.__filesAdded and self.__listerThread.isAlive():
+            while not self.__filesAdded and self.__listerThread.is_alive():
                time.sleep(0.05)
         self.refreshDisplay()
 
     def onExit(self):
         if self.__listerThread != None: self.__listerThread.stop()
+        self.__listerThread = None
 
     def modifyKeymaps(self):
         # override CList commands; handle them in doListCommand
@@ -458,12 +431,13 @@ class CFileBrowser(CList):
 
     def process(self, curindex=0, cwd=None, startmode=CList.MODE_NORMAL):
         # self.subdirDepth = 20 # XXX TESTING
-        if cwd == None: cwd = os.getcwd()
+        if cwd == None: cwd = os.getcwdu()
         else:
-            if not os.path.exists(cwd): cwd = os.getcwd()
+            vimenc = vim.eval("&encoding")
+            cwd = cwd.decode(vimenc)
+            if not os.path.exists(cwd): cwd = os.getcwdu()
             fst = os.stat(cwd)
-            if not stat.S_ISDIR(fst.st_mode): cwd = os.getcwd()
+            if not stat.S_ISDIR(fst.st_mode): cwd = os.getcwdu()
         self.loadDirectory(cwd)
-        CList.process(self, curindex, startmode=startmode) # TODO: startmode=sth.NORMAL
-        self.onExit()
+        CList.process(self, curindex, startmode=startmode)
 

@@ -93,9 +93,9 @@ class CTextMenu(popuplist.CList):
         for it in items: addChar(it.quickchar)
         if chars[None] < 1: return
         for it in (i for i in items if i.quickchar == None):
-            for ch in wordStarts(it._text):
+            for ch in wordStarts(it._text): # XXX: _text should not be used
                 if not chars.has_key(ch):
-                    it.quickchar = ch
+                    it.quickchar = ch # XXX: item modified
                     addChar(ch)
                     chars[None] -= 1
                     break
@@ -104,7 +104,7 @@ class CTextMenu(popuplist.CList):
                 ch = ch.lower()
                 if not isValidChar(ch): continue
                 if not chars.has_key(ch):
-                    it.quickchar = ch
+                    it.quickchar = ch # XXX: item modified
                     addChar(ch)
                     chars[None] -= 1
                     break
@@ -134,7 +134,7 @@ class CTextMenu(popuplist.CList):
         for i in self.curitems:
             menuitem = self.menuitems[i]
             listitem = popuplist.CListItem(menuitem.getDisplayText(self.submenuIcon))
-            listitem.quickchar = menuitem.getQuickChar()
+            listitem.quickchar = menuitem.getQuickChar() # XXX: item modified
             self.allitems.append(listitem)
         self.assignQuickChars(self.allitems)
         self.updateMenuTitle()

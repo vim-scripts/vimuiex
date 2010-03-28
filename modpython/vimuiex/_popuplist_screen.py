@@ -71,6 +71,7 @@ class CNumSelect(object):
             return -1
         return i
 
+
 class CPopupListbox(object):
     EXIT = 0
     NORMAL = 1
@@ -232,24 +233,35 @@ class CPopupListbox(object):
     def _drawPageInfo(self):
         pgsz = self.lastline + 1
         npages = (self.itemCount + pgsz - 1) / pgsz
-        if npages < 2: return
-        ipage = (self.topindex + 1) / pgsz + 1
-        ptxt = "%d/%d" % (ipage, npages)
-        x = self.width - len(ptxt) - 4
+        if npages > 1:
+            ipage = (self.topindex + 1) / pgsz + 1
+            ptxt = "%d/%d" % (ipage, npages)
+            x = self.width - len(ptxt) - 4
+            co = self.coNormal
+            self.window.addstr(self.height - 1, x, ptxt, co)
+        if self.itemlist.hasBackgroundTasks():
+            self.window.addstr(self.height - 1, self.width-3, "*", self.coNormal)
+
+    def _drawBackgroundTask(self, state):
+        if not self.itemlist.hasBackgroundTasks(): return
+        x = self.width - 3
+        ptxt = r"-\|/"[state % 4]
         co = self.coNormal
         self.window.addstr(self.height - 1, x, ptxt, co)
 
     def _drawFilter(self):
         if self.itemlist.strFilter != "" or self.keyboardMode == CList.MODE_FILTER:
-            mtw = self.width - 6
+            prompt = "/"
+            if self.keyboardMode == CList.MODE_NUMSELECT: prompt = "#%s /" % (self.numselect.curNumber)
+            if self.keyboardMode == CList.MODE_QUICK: prompt = "&& /"
+
+            mtw = self.width - 8 - len(prompt)
             if mtw > 10: fieldw = 10
             else: fieldw = mtw
             s = self.itemlist.strFilter
-            if len(s) > mtw: s = "/...%s" % s[-(mtw-3):]
-            else: s = "/%*s" % (-fieldw+1, s)
-            if self.keyboardMode == CList.MODE_NUMSELECT: s = ("#%s " % self.numselect.curNumber) + s
-            if self.keyboardMode == CList.MODE_QUICK: s = "&& " + s
-            if len(s) > mtw: s = s[-(mtw-3):]
+            if len(s) > mtw: s = "..." + s[-(mtw-3):]
+            s = "%*s" % (-fieldw, prompt + s)
+
             if self.keyboardMode == CList.MODE_FILTER: co = self.coSelected
             else: co = self.coNormal
             self.window.addstr(self.height - 1, 2, s, co)
@@ -257,6 +269,17 @@ class CPopupListbox(object):
             self.window.addstr(self.height - 1, 2, "&&", self.coSelected)
         elif self.keyboardMode == CList.MODE_NUMSELECT:
             self.window.addstr(self.height - 1, 2, "#%s" % self.numselect.curNumber, self.coSelected)
+
+    def _drawFilterCursor(self, visible):
+        if self.keyboardMode != CList.MODE_FILTER: return
+        maxlen = self.width - 8
+        s = self.itemlist.strFilter
+        if len(s) < maxlen: pos = len(s)
+        else: pos = maxlen - 1
+        co = self.coSelected
+        if visible: char = "|"
+        else: char = " "
+        self.window.addstr(self.height - 1, 3 + pos, char, co)
 
     def drawLastLine(self): # status
         chline = self.window.linechars[0]
@@ -367,7 +390,7 @@ class CPopupListbox(object):
         elif cmd == "togglemarked":
             items = self.itemlist.items
             if self.curindex >= 0 and self.curindex < len(items):
-                items[self.curindex].marked = not items[self.curindex].marked
+                items[self.curindex].marked = not items[self.curindex].marked ## XXX item modified
                 if self.itemlist._moveDownOnMark: self.setCurIndex(self.curindex + 1, redraw=True)
                 else: self.setCurIndex(self.curindex, redraw=True)
                 # TODO: Redraw only current item on togglemarked
@@ -396,23 +419,26 @@ class CPopupListbox(object):
             prompt = prompt.replace("{{extra}}", p3)
         return prompt
 
-    def _vim_getkey(self):
+    def _vim_getkey(self, timeout=0):
+        def getchar():
+            # (7.2.320) getchar(0) blocks in console when Esc is pressed; it is unblocked with next keypress
+            key = vim.eval("getchar()")
+            try:
+                key = int(key)
+                if key > 0 and key < 256: key = chr(key)
+                elif key > 255:
+                    key = u"%c" % key
+                    key = key.encode("utf-8")
+            except: pass
+            return key
+            # TODO: Capture mouse position
+            # Useless... v:mouse_lnum contains text line number, not screen line number
+            # ( variables added with pathch 7.0.155, eval.c, vim.h )
+            # print vim.eval('v:mouse_win . " " . v:mouse_lnum . " " . v:mouse_col')
+            # self.lastclick = (screen.mousex - self.left, screen.mousey - self.top)
+            # print self.lastclick
         ioutil.CScreen().showPrompt(self._buildPrompt())
-        key = vim.eval("getchar()")
-        try:
-            key = int(key)
-            if key >= 0 and key < 256: key = chr(key)
-            elif key > 255:
-                key = u"%c" % key
-                key = key.encode("utf-8")
-        except: pass
-        # TODO: Capture mouse position
-        # Useless... v:mouse_lnum contains text line number, not screen line number
-        # ( variables added with pathch 7.0.155, eval.c, vim.h )
-        # print vim.eval('v:mouse_win . " " . v:mouse_lnum . " " . v:mouse_col')
-        # self.lastclick = (screen.mousex - self.left, screen.mousey - self.top)
-        # print self.lastclick
-        return key
+        return getchar()
 
     def relayout(self, position, size):
         self.hide()
@@ -488,13 +514,22 @@ class CPopupListbox(object):
         self.refresh()
         self.exitcommand = None
         keyseq = ""
+        tmLastCheck = 0
+        tmMinRefresh = 3
         while self.keyboardMode != CPopupListbox.EXIT:
             curitem = self.getCurrentItem()
-            if self.itemlist.checkPendingItems():
-                if curitem != None: self.setCurrentItem(curitem)
+            tm = time.time()
+            if tm < tmLastCheck: tmLastCheck = tm
+            deltaLastCheck = tm - tmLastCheck
+            if deltaLastCheck > tmMinRefresh or not self.itemlist.hasBackgroundTasks():
+                if self.itemlist.checkPendingItems():
+                    if curitem != None: self.setCurrentItem(curitem)
+                    tmLastCheck = time.time()
             self.refresh()
             oldmode = self.keyboardMode
-            ch = self._vim_getkey()
+            if deltaLastCheck < tmMinRefresh: ch = self._vim_getkey(timeout = tmMinRefresh - deltaLastCheck)
+            else: ch = self._vim_getkey(timeout=5)
+            if ch == 0: continue
 
             if ch != None:
                 keyseq += ch
@@ -527,6 +562,11 @@ class CPopupListbox(object):
 class CPopupListboxScreen(CPopupListbox):
     colorSchemeChecked = "--"
     def initPlatform(self):
+        # getchar(0) works only in GVim; it is "broken" for Esc otherwise (linux console)
+        self.enableCursor = False
+        try: self.enableCursor = int(vim.eval("has('gui_running')")) != 0
+        except: self.enableCursor = False
+ 
         try: cs = vim.eval("exists('g:colors_name') ? g:colors_name : ('*bg*' . &background)")
         except vim.error: cs="--"
         if cs != CPopupListboxScreen.colorSchemeChecked:
@@ -551,7 +591,37 @@ class CPopupListboxScreen(CPopupListbox):
             self.coMarked = 4
             self.coSelMarked = self.coSelected
             self.coTitle = self.coMarked
-    pass
+
+    # In GVim the Esc key doesn't block getchar(0) like console vim,
+    # so we can perform background tasks (cursor, progress, etc.)
+    def _vim_getkey(self, timeout=0):
+       def getchar():
+           if self.enableCursor: key = vim.eval("getchar(0)")
+           else: key = vim.eval("getchar()")
+           try:
+               key = int(key)
+               if key > 0 and key < 256: key = chr(key)
+               elif key > 255:
+                   key = u"%c" % key
+                   key = key.encode("utf-8")
+           except: pass
+           return key
+       ioutil.CScreen().showPrompt(self._buildPrompt())
+       if self.enableCursor and timeout > 0:
+          count = 0
+          tmnow = time.time(); tmend = tmnow + timeout; tm = tmnow
+          key = getchar()
+          while key == 0:
+              progress = int( (tm - int(tm)) * 100)
+              self._drawFilterCursor(progress >= 50)
+              self._drawBackgroundTask(progress / 25)
+              time.sleep(0.05)
+              key = getchar()
+              tm = time.time()
+              if tm > tmend or tm < tmnow: break
+          return key
+       return getchar()
+    #pass
 
 class CPopupListboxCurses(CPopupListbox):
     def initPlatform(self):
@@ -577,5 +647,5 @@ class CPopupListboxCurses(CPopupListbox):
             self.coMarked = self.coHilight
             self.coSelMarked = self.coSelected
             self.coTitle =  self.coNormal
-    pass
+ 
 

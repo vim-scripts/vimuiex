@@ -44,6 +44,7 @@ def vimScreenSize():
     return (int(vim.eval("&columns")), int(vim.eval("&lines")))
 
 class CListItem(object):
+    __slots__ = ('isTitle', '_text', 'quickchar', 'marked') # Reduce memory use
     def __init__(self, text=""):
         self.isTitle = False     # True if this item is a title
         self._text = text
@@ -323,7 +324,6 @@ class CList(object):
         self.refreshDisplay()
 
     def loadUnicodeItems(self, pylist):
-        # TODO: convert to unicode
         self.allitems = [CListItem(line) for line in pylist]
         self.refreshDisplay()
     
@@ -335,7 +335,7 @@ class CList(object):
         rx = re.compile(reSearch)
         for i in self.allitems:
             if (rx.search(i._text) != None) == (noinvert != 0): # TODO: shouldn't use _text
-                i.isTitle = True
+                i.isTitle = True ## XXX item modified
 
     def getTrueIndex(self, filteredIndex):
         if self.__items != None: nitems = len(self.__items)
@@ -421,18 +421,22 @@ class CList(object):
         if self.__listbox != None:
             self.__listbox.relayout(self.position, self.size)
 
+    def hasBackgroundTasks(self):
+        return False
+
     # Check if any items were added to the list while the list is being displayed.
     # This function enables adding items to the list incrementally.
     def checkPendingItems(self):
         if self._pendingItems == None: return False
         if len(self._pendingItems) < 1: return False
-        self._pendingItemsLock.acquire()
         merged = False
         try:
+            self._pendingItemsLock.acquire()
             if self._pendingItems != None: # re-check
                 merged = True
-                self.allitems = self.mergeItems(self.allitems, self._pendingItems)
+                newitems = self._pendingItems
                 self._pendingItems = None
+                self.allitems = self.mergeItems(self.allitems, newitems)
                 self.restartFilter(full=True) # reapply filter
                 self.relayout()
         finally:
@@ -453,19 +457,21 @@ class CList(object):
         self.relayout()
 	self.__listbox = lbimpl.createListboxView(position=self.position, size=self.size)
 	self.__listbox.setItemList(self)
-	exitcmd = self.__listbox.process(curindex, startmode)
-        # WX: will exit immediately; non-modal window
-        # Curses: will exit after processing and return the exit command (modal window)
-        if exitcmd != None:
-            cmd = None
-            if exitcmd[0] == "accept": cmd = self.cmdAccept
-            elif exitcmd[0] == "quit": cmd = self.cmdCancel
-            if cmd != None:
-                import inspect
-                idx = exitcmd[1]
-                if inspect.isfunction(cmd): cmd(self.getTrueIndex(idx))
-                elif type(cmd) == type("") and cmd != "":
-                    cmd = self.expandVimCommand(cmd, idx)
-                    vim.eval(cmd)
-        self.onExit()
+        try:
+            exitcmd = self.__listbox.process(curindex, startmode)
+            # WX: will exit immediately; non-modal window
+            # Curses: will exit after processing and return the exit command (modal window)
+            if exitcmd != None:
+                cmd = None
+                if exitcmd[0] == "accept": cmd = self.cmdAccept
+                elif exitcmd[0] == "quit": cmd = self.cmdCancel
+                if cmd != None:
+                    import inspect
+                    idx = exitcmd[1]
+                    if inspect.isfunction(cmd): cmd(self.getTrueIndex(idx))
+                    elif type(cmd) == type("") and cmd != "":
+                        cmd = self.expandVimCommand(cmd, idx)
+                        vim.eval(cmd)
+        finally:
+            self.onExit()
 

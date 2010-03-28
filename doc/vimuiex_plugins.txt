@@ -114,7 +114,7 @@ VxFileBrowser                                    *vimuiex-vxfilebrowser*
 
 Displays the contents of a directory implied by the |browsedir| option. The
 subdirectories are displayed with a preceeding '+'. The files are sorted by
-name.  A file or a directory can be selected from the list as described in
+name. A file or a directory can be selected from the list as described in
 |vimuiex-operation|. When <CR> is pressed on a selected file, that file is
 loaded (if not already loaded) and activated. The selected file can also be
 opened with the following commands:
@@ -167,12 +167,13 @@ The size of the recent directory list can be changed with: >
 VxFileFilter                                  *vimuiex-vxfilefilter*
 -------------
 
-Displays a list of files under the current directory up to a certain depth.
-It may take some time to scan the filesystem with many files. The initial list
-is displayed after the first 300 files are added. The subsequent files are
-read in a background thread and the list is updated after every keypress
-untill all the files are added. The listbox starts up in filtering mode. The
-operation is exactly the same as in vxfilebrowser.
+Displays the contents of a directory implied by the |browsedir| option and its
+subdirectories up to a certain depth. It may take some time to scan the
+filesystem with many files. The initial list is displayed after the first 300
+files are added. The subsequent files are read in a background thread and the
+list is updated after every keypress until all the files are added. The
+listbox starts up in filtering mode. The operation is exactly the same as in
+VxFileBrowser (|vimuiex-vxfilebrowser|).
 
 Filtering a large list of file items may be slow. To speed things up, the
 filter is applied only to the already dispayed list, if the new value of
