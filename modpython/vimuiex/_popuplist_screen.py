@@ -560,23 +560,16 @@ class CPopupListbox(object):
         return self.exitcommand
 
 class CPopupListboxScreen(CPopupListbox):
-    colorSchemeChecked = "--"
     def initPlatform(self):
         # getchar(0) works only in GVim; it is "broken" for Esc otherwise (linux console)
         self.enableCursor = False
         try: self.enableCursor = int(vim.eval("has('gui_running')")) != 0
         except: self.enableCursor = False
  
-        try: cs = vim.eval("exists('g:colors_name') ? g:colors_name : ('*bg*' . &background)")
-        except vim.error: cs="--"
-        if cs != CPopupListboxScreen.colorSchemeChecked:
-            try: vim.eval("vimuiex#vxlist#CheckHilightItems()")
-            except vim.error: pass
-            CPopupListboxScreen.colorSchemeChecked = cs
-
         # TODO: create user setting in vim for outputEncoding
         self.outputEncoding = vim.eval("&encoding")
         try:
+            ioutil.CheckColorScheme()
             self.coNormal = vim.screen.getHighlightAttr("VxNormal")
             self.coSelected = vim.screen.getHighlightAttr("VxSelected")
             self.coHilight = vim.screen.getHighlightAttr("VxQuickChar")

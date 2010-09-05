@@ -53,5 +53,11 @@ finish
 " <VIMPLUGIN id="vimuiex#vxjump" require="python&&python_screen">
    command VxLineJump call vimuiex#vxjump#VxLineJump()
    command VxWindowJump call vimuiex#vxjump#VxWindowJump()
+   nmap <silent><unique> <Plug>VxLineJump :VxLineJump<cr>
+   imap <silent><unique> <Plug>VxLineJump <Esc>:VxLineJump<cr>
+   vmap <silent><unique> <Plug>VxLineJump :<c-u>VxLineJump<cr>
+   nmap <silent><unique> <Plug>VxWindowJump :VxWindowJump<cr>
+   imap <silent><unique> <Plug>VxWindowJump <Esc>:VxWindowJump<cr>
+   vmap <silent><unique> <Plug>VxWindowJump :<c-u>VxWindowJump<cr>
 " </VIMPLUGIN>
 

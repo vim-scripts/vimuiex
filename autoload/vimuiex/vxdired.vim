@@ -151,6 +151,14 @@ finish
          let dir = fnamemodify(a:filename, ':p:h')
          let dirs = g:VxPluginVar.vxrecentfile_dirs
          let idx = index(dirs, dir, 0, g:VxRecentFile_nocase)
+         if idx == -1
+            let rdirs = []
+            for fnm in dirs
+               call add(rdirs, resolve(fnm))
+            endfor
+            let rfname = resolve(dir)
+            let idx = index(rdirs, rfname, 0, g:VxRecentFile_nocase)
+         endif
          if idx == -1 && len(dirs) >= g:VxRecentDir_size
             let idx = g:VxRecentDir_size - 1
          endif
@@ -172,5 +180,11 @@ finish
 
    command VxFileBrowser call vimuiex#vxdired#VxFileBrowser('browse')
    command VxFileFilter call vimuiex#vxdired#VxFileBrowser('filter')
+   nmap <silent><unique> <Plug>VxFileBrowser :VxFileBrowser<cr>
+   imap <silent><unique> <Plug>VxFileBrowser <Esc>:VxFileBrowser<cr>
+   vmap <silent><unique> <Plug>VxFileBrowser :<c-u>VxFileBrowser<cr>
+   nmap <silent><unique> <Plug>VxFileFilter :VxFileFilter<cr>
+   imap <silent><unique> <Plug>VxFileFilter <Esc>:VxFileFilter<cr>
+   vmap <silent><unique> <Plug>VxFileFilter :<c-u>VxFileFilter<cr>
 
 " </VIMPLUGIN>

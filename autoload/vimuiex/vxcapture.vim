@@ -135,5 +135,11 @@ finish
    command VxMarks call vimuiex#vxcapture#VxMarks()
    command VxDisplay call vimuiex#vxcapture#VxDisplay()
    command -nargs=+ VxMan call vimuiex#vxcapture#VxMan_QArgs(<q-args>)
+   nmap <silent><unique> <Plug>VxMarks :VxMarks<cr>
+   imap <silent><unique> <Plug>VxMarks <Esc>:VxMarks<cr>
+   vmap <silent><unique> <Plug>VxMarks :<c-u>VxMarks<cr>
+   nmap <silent><unique> <Plug>VxDisplay :VxDisplay<cr>
+   imap <silent><unique> <Plug>VxDisplay <Esc>:VxDisplay<cr>
+   vmap <silent><unique> <Plug>VxDisplay :<c-u>VxDisplay<cr>
 " </VIMPLUGIN>
 

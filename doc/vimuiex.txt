@@ -1,7 +1,7 @@
-*vimuiex.txt*        User Interface Extensions      Last Change: March 2010
+*vimuiex.txt*        User Interface Extensions      Last Change: August 2010
 
 User Interface Extensions (Experiment)
-Version 0.6
+Version 0.7
 
  *vimuiex*
   Description                     |vimuiex-description|
@@ -9,7 +9,7 @@ Version 0.6
   Plugins                         |vimuiex-plugins|     
   Python library usage            |vimuiex-pythonlib|   
   Installation                    |vimuiex-installation|
-  TESTING                         |vimuiex-testing|     
+  Example configuration           |vimuiex-keymap|
 
 For Vim version 7.2 and above.
 Requires python interface. A patch is required for GVim.
@@ -37,22 +37,23 @@ A popup list has 4 basic modes of operation:
 				       *vimuiex-navigation*
 The following commands are available when in normal operation:
 
-   j, <down>, <tab>	     next
-   k, <up>, <s-tab>	     previous
-   h, <left>		     shift left
-   l, <right>		     shift right
-   n, <space>, <pgdown>	     page down
-   b, <pgup>		     page up
-   0, gg, <home>	     top of list
-   $, G, <end>		     bottom of list
-   f, /			     enter filtering mode |vimuiex-filtering|
-   i, #			     enter numeric mode |vimuiex-numeric|
-   &			     enter quickchar mode |vimuiex-quickchar|
-   q, <Esc>		     close the list without selection
-   <CR>			     select the current item and execute a command
-   wh, wj, wk, wl	     move window to border
-   wc, wv, wC		     center window
-   m                         toggle item's marked state
+   j, <down>, <tab>	  next
+   k, <up>, <s-tab>	  previous
+   h, <left>		  shift left
+   l, <right>		  shift right
+   n, <space>, <pgdown>	  page down
+   b, <pgup>		  page up
+   0, gg, <home>	  top of list
+   $, G, <end>		  bottom of list
+   f, /			  enter filtering mode |vimuiex-filtering|
+   i, #			  enter numeric mode |vimuiex-numeric|
+   &			  enter quickchar mode |vimuiex-quickchar|
+   q, <Esc>		  close the list without selection
+   <CR>			  select the current item and execute a command
+   wh, wj, wk, wl	  move window to border
+   wc, wv, wC		  center window
+   m                      toggle item's marked state
+   F1                     help - shows the currently mapped keys for all modes
 
 				       *vimuiex-filtering*
 In filtering mode new ASCII characters are added to the filter and only the 
@@ -254,31 +255,62 @@ applied to Vim source. The patch and prebuilt binaries are available at:
   http://sourceforge.net/projects/vimuiex/files/
 
 Note: In versions 0.1 - 0.4 a wxpython implementation was also available. The
-implementation was not updated and tested in versions 0.5-0.6.
+implementation was not updated and tested in versions 0.5-0.7.
+
 ==============================================================================
-TESTING							     *vimuiex-testing*
+EXAMPLE CONFIGURATION				       	      *vimuiex-keymap*
 
-The library is experimental.
+Here is an example configuration that maps most of the commands from the
+vimuiex package. The code can be copied to .vimrc.
 
-Version 0.4 was tested on these configurations:
+      call vxlib#plugin#Init()
 
-Linux
-   * kubuntu 8.10
-   * kubuntu 9.04 (patch for ubuntu-python25-curses required)
-      see: https://bugs.launchpad.net/ubuntu/+source/python2.5/+bug/369203
-   * python 2.5, python 2.6
-   * gvim + wx ( python wx.version()='2.8.8.0 (gtk2-unicode)' )
-   * vim + curses ( python curses.version=2.2 )
-   * terminals:
-      * working: konsole, xterm, aterm, eterm, rxvt, gnome-terminal; all in
-	color mode
-      * xvt (monochrome)
+      " configure the positions of various popup windows
+      VxLet VxPopupListPos default "position=525"
+      VxLet VxPopupListPos VxBufListSelect "position=534 minsize=0.5,8"
+      VxLet VxPopupListPos VxOpenRecentFile "position=534 minsize=0.5,8"
+      VxLet VxPopupListPos VxTextMenu "position=524"
 
-Windows
-   * XP
-   * gvim
-   * python 2.4
-   * wxpython (2.8.9.2)
+      " VxOccur: use grep+xargs+find
+      let g:vxoccur_grep_mode = 2
+
+      nmap <silent> <F2> <Plug>VxFileBrowser
+      imap <silent> <F2> <Plug>VxFileBrowser
+      vmap <silent> <F2> <Plug>VxFileBrowser
+      nmap <silent> <s-F2> <Plug>VxFileFilter
+      imap <silent> <s-F2> <Plug>VxFileFilter
+      vmap <silent> <s-F2> <Plug>VxFileFilter
+      nmap <silent> <F3> <Plug>VxBufListSelect
+      imap <silent> <F3> <Plug>VxBufListSelect
+      vmap <silent> <F3> <Plug>VxBufListSelect
+      nmap <silent> <s-F3> <Plug>VxOpenRecentFile
+      imap <silent> <s-F3> <Plug>VxOpenRecentFile
+      vmap <silent> <s-F3> <Plug>VxOpenRecentFile
+      nmap <silent> <c-F5> <Plug>VxMapDefaultKeys
+      imap <silent> <c-F5> <Plug>VxMapDefaultKeys
+      vmap <silent> <c-F5> <Plug>VxMapDefaultKeys
+      nmap <silent> <F9> <Plug>VxTextMenu
+      imap <silent> <F9> <Plug>VxTextMenu
+      vmap <silent> <F9> <Plug>VxTextMenu
+      nmap <silent> gl <Plug>VxLineJump
+      vmap <silent> gl <Plug>VxLineJump
+      nmap <silent> gt <Plug>VxWindowJump
+      vmap <silent> gt <Plug>VxWindowJump
+      nmap <silent> [I <Plug>VxOccurCurrent
+      vmap <silent> [I <Plug>VxOccurCurrent
+   
+      " The following keymaps conflict with netrw-gx, so we disable it
+      let g:netrw_nogx=1
+      nmap <silent> gxr <Plug>VxOccurRoutines
+      nmap <silent> gxt <Plug>VxOccurTags
+      nmap <silent> gxx <Plug>VxOccurRegex
+      nmap <silent> g/ <Plug>VxOccurRegex
+
+      nmap <silent> gxh <Plug>VxOccurSelectHist
+      nmap <silent> gxv <Plug>VxOccurHist
+      nmap <silent> gxn <Plug>VxCNext
+      nmap <silent> gxp <Plug>VxCPrev
+
 
 
 

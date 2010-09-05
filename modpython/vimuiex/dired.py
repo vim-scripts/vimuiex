@@ -133,7 +133,7 @@ class CFileItem(CListItem):
         self.path = path
         self._ftype = 'f'
         self.attrs = attrs
-    
+
     @property
     def displayText(self):
         if self.owner._attributesVisible: return u"%s   %s" % (self.attrs, os.path.join(self.path, self._text))

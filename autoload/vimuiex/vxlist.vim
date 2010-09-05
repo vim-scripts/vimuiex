@@ -79,6 +79,7 @@ endfunc
 "     a:1['init'] - initialization function name: function cb(pyListName);
 "           called just before process()
 "     a:1['callback'] - callback expression for the 'accept' action
+"     a:1['callback_cancel'] - callback expression for the 'cancel' action
 "     a:1['prompt'] - the prompt to be displayed in the command line
 "     a:1['current'] - index of initially selected item
 "     a:1['marked'] - list of initially marked items indices;
@@ -96,6 +97,7 @@ function! vimuiex#vxlist#VxPopup(items, title, ...)
    let s:MarkedItems = []
    let default_callback = s:SNR . 'SelectItem({{i}})'
    let callback = default_callback
+   let cbcancel = ''
    let cbinit = ''
    let prompt = ''
    let returns = 's'
@@ -117,6 +119,15 @@ function! vimuiex#vxlist#VxPopup(items, title, ...)
             let cbexpr = a:1['callback']
             let cbname = matchstr(cbexpr, '^\s*\zs[^(]\+\ze\((\|$\)') " extract cb name till ( or $
             if exists('*' . cbname) | let callback = cbexpr | endif
+         catch /.*/
+            echom 'VxPopup ('. optid . '): callback does not exist.'
+         endtry
+      endif
+      if has_key(a:1, 'callback_cancel') 
+         try
+            let cbexpr = a:1['callback_cancel']
+            let cbname = matchstr(cbexpr, '^\s*\zs[^(]\+\ze\((\|$\)') " extract cb name till ( or $
+            if exists('*' . cbname) | let cbcancel = cbexpr | endif
          catch /.*/
             echom 'VxPopup ('. optid . '): callback does not exist.'
          endtry
@@ -149,6 +160,7 @@ function! vimuiex#vxlist#VxPopup(items, title, ...)
    exec 'python def SNR(s): return s.replace("$SNR$", "' . s:SNR . '")'
    python List.loadVimItems(SNR("$SNR$GetItems()"))
    exec 'python List.cmdAccept="' . escape(callback, '"\') . '"'
+   exec 'python List.cmdCancel="' . escape(cbcancel, '"\') . '"'
    if columns > 0
       python List._firstColumnAlign = True
    endif

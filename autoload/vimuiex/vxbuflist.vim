@@ -176,4 +176,7 @@ finish
       autocmd BufEnter * call s:VIMUIEX_buflist_pushBufNr(bufnr('%'))
    augroup END
    command VxBufListSelect call vimuiex#vxbuflist#VxBufListSelect()
+   nmap <silent><unique> <Plug>VxBufListSelect :VxBufListSelect<cr>
+   imap <silent><unique> <Plug>VxBufListSelect <Esc>:VxBufListSelect<cr>
+   vmap <silent><unique> <Plug>VxBufListSelect :<c-u>VxBufListSelect<cr>
 " </VIMPLUGIN>

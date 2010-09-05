@@ -22,24 +22,26 @@ def rewriteKey(keyseq):
         key = match.group(1).upper()
         return "\xff%s" % key
     for p in parts:
-        newparts.append(re.sub(r"\\(<[a-zA-Z-]+>)", replUpper, p))
+        newparts.append(re.sub(r"\\(<[a-zA-Z0-9-]+>)", replUpper, p))
     return "\\".join(newparts)
 
-# a read-only dictionary
-class CKeyCode:
-    def __init__(self):
-        self.keys = {}
-    def __getitem__(self, key):
-        # TODO: do some preprocessing on the key (eg. <C-A> --> \x01)
-        if not self.keys.has_key(key):
-            self.keys[key] = rewriteKey(r"\<%s>" % key.upper())
-        return self.keys[key]
+## a read-only dictionary
+#class CKeyCode:
+#    def __init__(self):
+#        self.keys = {}
+#    def __getitem__(self, key):
+#        # TODO: do some preprocessing on the key (eg. <C-A> --> \x01)
+#        if not self.keys.has_key(key):
+#            self.keys[key] = rewriteKey(r"\<%s>" % key.upper())
+#        return self.keys[key]
 
-KEYCODE = CKeyCode()
+#KEYCODE = CKeyCode()
 
 class CSimpleKeymap:
-    def __init__(self):
+    def __init__(self, name="Keymap"):
+        self.name = name
         self._keys = {}
+        self._keydefs = {}
 
     def findKey(self, keyseq):
         for seq in self._keys.iterkeys():
@@ -48,8 +50,8 @@ class CSimpleKeymap:
             if seq.startswith(keyseq): return (KM_PREFIX, None)
         return (KM_NOTFOUND, None)
 
-    def setKey(self, keyseq, command):
-        keyseq = rewriteKey(keyseq)
+    def setKey(self, vimKeyExpr, command):
+        keyseq = rewriteKey(vimKeyExpr)
         for seq in self._keys.iterkeys():
             if seq == keyseq: continue # replacing a command
             elif seq.startswith(keyseq):
@@ -58,17 +60,38 @@ class CSimpleKeymap:
                 print "Warning: key '%s' is a prefix of key '%s'" (seq, keyseq)
         self._keys[keyseq] = command
 
-    def clearKey(self, keyseq):
+        def fmtKey(match):
+            key = match.group(1).lower()
+            return "%s" % key
+        vimKeyExpr = re.sub(r"\\(<[a-zA-Z0-9-]+>)", fmtKey, vimKeyExpr)
+
+        self._keydefs[keyseq] = vimKeyExpr
+
+    def clearKey(self, vimKeyExpr):
+        keyseq = rewriteKey(vimKeyExpr)
         self._keys.pop(keyseq, None)
+        self._keydefs.pop(keyseq, None)
 
     # Clear all keys with prefix keyseq
-    def clearKeyPrefix(self, keyseq):
-        keys = [k for k in self._keys.iterkeys() if k.startswith(keyseq)]
-        for k in keys: self._keys.pop(k, None)
+    def clearKeyPrefix(self, vimKeyExpr):
+        keyseq = rewriteKey(vimKeyExpr)
+        for k in self._keys.iterkeys():
+            if k.startswith(keyseq):
+                self._keys.pop(keyseq, None)
+                self._keydefs.pop(keyseq, None)
 
     def clearAllKeys(self):
         self._keys = {}
+        self._keydefs = {}
+
+    # returns: list[ (keyname, command), ... ]
+    def getMappedKeys(self):
+        keys = []
+        for k,v in self._keydefs.items():
+            if not self._keys.has_key(k): keys.append( (v, '????') )
+            else: keys.append( (v, self._keys[k]) )
+        return keys
 
 if __name__ == "__main__":
     keyseq = r"g\<CR>\<Esc>\\f"
-    print keyseq, "-->", rewriteKeysequence(keyseq)
+    print keyseq, "-->", rewriteKey(keyseq)

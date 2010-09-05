@@ -3,10 +3,11 @@
 # Author:  Marko Mahnič
 # Created: jun 2009 
 
+import vim
+
 PLATFORM = None
 def __detectPlatform():
     try:
-        import vim
         if vim.screen != None: return "vim.screen"
     except Exception as e:
         print "Exception: %s" % e
@@ -49,3 +50,14 @@ def CWindow(height, width, y, x):
         import wincurses
         return wincurses.CWindow(height, width, y, x)
     return None
+
+colorSchemeChecked = "--"
+def CheckColorScheme():
+    global colorSchemeChecked
+    try: cs = vim.eval("exists('g:colors_name') ? g:colors_name : ('*bg*' . &background)")
+    except vim.error: cs="--"
+    if cs != colorSchemeChecked:
+        try: vim.eval("vimuiex#vxlist#CheckHilightItems()")
+        except vim.error: pass
+        colorSchemeChecked = cs
+

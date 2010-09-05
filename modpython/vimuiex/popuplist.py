@@ -97,7 +97,7 @@ class CList(object):
         self._moveDownOnMark = True
         self.maxColumnWidth = 0.3
         self.allitems = []
-        self.strFilter = "" 
+        self.strFilter = ""
         self._filter = textfilter.CWordFilter()
         self.__items = None     # Displayed (filtered) items; delayed creation in items()
         self.__listbox = None   # Listbox implementation
@@ -105,10 +105,10 @@ class CList(object):
         self._pendingItems = None
         self.sort = True        # sort input list
         self.filtersort = True  # sort filtered data (quickchar, startswith, contains)
-        self.keymapNorm = simplekeymap.CSimpleKeymap()
-        self.keymapFilter = simplekeymap.CSimpleKeymap()
-        self.keymapQuickChar = simplekeymap.CSimpleKeymap()
-        self.keymapNumSelect = simplekeymap.CSimpleKeymap()
+        self.keymapNorm = simplekeymap.CSimpleKeymap("Normal")
+        self.keymapFilter = simplekeymap.CSimpleKeymap("Filter")
+        self.keymapQuickChar = simplekeymap.CSimpleKeymap("Quick-char selection")
+        self.keymapNumSelect = simplekeymap.CSimpleKeymap("Numeric selection")
         self.quickCharAutoSelect = "accept" # An item with a unique quick char will be auto-"accept"-ed; TODO: make it nicer
         self.cmdCancel = "" # 'echo "canceled"'
         self.cmdAccept = "" # 'echo "accepted {{i}}"'
@@ -131,6 +131,7 @@ class CList(object):
 
     def initKeymaps(self):
         def addCursorMoves(kn):
+            kn.setKey(r"\<F1>", "listbox-help")
             kn.setKey(r"\<down>", "next")
             kn.setKey(r"\<up>", "prev")
             kn.setKey(r"\<left>", "lshift")
@@ -148,7 +149,7 @@ class CList(object):
         kn.setKey(r"k", "prev")
         kn.setKey(r"h", "lshift")
         kn.setKey(r"l", "rshift")
-        kn.setKey(r" ", "nextpage")
+        kn.setKey(r"\<space>", "nextpage")
         kn.setKey(r"b", "prevpage")
         kn.setKey(r"n", "nextpage") # MAYBE: remove mapping
         kn.setKey(r"p", "prevpage") # MAYBE: remove mapping
@@ -165,13 +166,13 @@ class CList(object):
         kn.setKey(r"m", "togglemarked")
         kn.setKey(r"\<Esc>", "quit")
         kn.setKey(r"\<CR>", "accept")
-        kn.setKey(r"wk", "winpos:align-top")
-        kn.setKey(r"wj", "winpos:align-bottom")
-        kn.setKey(r"wh", "winpos:align-left")
-        kn.setKey(r"wl", "winpos:align-right")
-        kn.setKey(r"wc", "winpos:align-hceneter")
-        kn.setKey(r"wv", "winpos:align-vceneter")
-        kn.setKey(r"wC", "winpos:align-ceneter")
+        #kn.setKey(r"wk", "winpos:align-top")
+        #kn.setKey(r"wj", "winpos:align-bottom")
+        #kn.setKey(r"wh", "winpos:align-left")
+        #kn.setKey(r"wl", "winpos:align-right")
+        #kn.setKey(r"wc", "winpos:align-hceneter")
+        #kn.setKey(r"wv", "winpos:align-vceneter")
+        #kn.setKey(r"wC", "winpos:align-ceneter")
         kn = self.keymapFilter
         addCursorMoves(kn)
         kn.setKey(r"\<CR>", "filter-accept")
@@ -194,9 +195,19 @@ class CList(object):
         kn.setKey(r"&", "quickchar")
         kn.setKey(r"/", "filter")
 
+    def doHelp(self):
+        from showhelp import CHelpDisplay
+        hd = CHelpDisplay()
+        hd.setKeymaps([self.keymapNorm, self.keymapFilter, self.keymapQuickChar, self.keymapNumSelect])
+        hd.process()
+        # vim.command("redraw!")
+        self.redraw()
+
     # TODO: 3. python: eval a python command
     def doCommand(self, cmd, curindex):
-        if cmd.startswith("list:"):
+        if cmd == "listbox-help":
+            self.doHelp()
+        elif cmd.startswith("list:"):
             cmd = self.doListCommand(cmd[5:].strip(), curindex)
         elif cmd.startswith("winpos:"):
             self.doWinposCmd(cmd[7:].strip())
@@ -319,14 +330,14 @@ class CList(object):
     def loadVimItems(self, vimvar):
         encoding = vim.eval("&encoding")
         self.allitems = [
-            CListItem(line.decode(encoding) if line != None else "")
+            CListItem(line.decode(encoding, "replace") if line != None else "")
             for line in vim.eval(vimvar)]
         self.refreshDisplay()
 
     def loadUnicodeItems(self, pylist):
         self.allitems = [CListItem(line) for line in pylist]
         self.refreshDisplay()
-    
+
     def loadTestItems(self):
         self.allitems = [CListItem(i) for i in [u"one"*14, u"two"*13, u"three"*12, u"four"*11] * 10]
         self.refreshDisplay()
@@ -376,7 +387,7 @@ class CList(object):
                         break
             newcmd.append(p)
         return "".join(newcmd)
-    
+
     def calcFirstColumnWidth(self, textwidth, items):
         mwf = self.maxColumnWidth
         if mwf < 0.2: mwf = 0.2
@@ -404,7 +415,8 @@ class CList(object):
     # TODO: optimize size calculation (cache results)
     def getMaxWidth(self):
         if len(self.allitems) < 1: return 0
-        return max([len(li.displayText) for li in self.allitems]) + 2
+        # len of longest item + border + 1space
+        return max([len(li.displayText) for li in self.allitems]) + 2 + 1
 
     def getMaxHeight(self):
         return len(self.allitems) + 2

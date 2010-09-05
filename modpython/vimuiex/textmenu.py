@@ -118,7 +118,7 @@ class CTextMenu(popuplist.CList):
             item = self.menuitems[self.menupath[level-1]]
             self.title = item.getTitleText()
 
-    def selectLevel(self):
+    def selectLevel(self, goDown=False):
         level = len(self.menupath)
         if level == 0: pos = 0
         else: pos = self.menupath[level-1] + 1
@@ -130,6 +130,15 @@ class CTextMenu(popuplist.CList):
             if m.level == level: self.curitems.append(pos)
             elif m.level < level: break
             pos += 1
+
+        # skip levels with a single submenu
+        if goDown and len(self.curitems) == 1:
+            mitem = self.menuitems[self.curitems[0]]
+            if mitem.submenu:
+                self.menupath.append(self.curitems[0])
+                self.selectLevel(goDown)
+                return
+
         self.allitems = []
         for i in self.curitems:
             menuitem = self.menuitems[i]
@@ -161,6 +170,13 @@ class CTextMenu(popuplist.CList):
             km.setKey("\<RightMouse>", "list:menu-goback")
         self.quickCharAutoSelect = "list:menu-select"
 
+    def getVimMenuPath(self, indices, currentItem=None):
+        path = [self.menuitems[prnt] for prnt in indices]
+        if currentItem != None: path.append(currentItem)
+        path = [m.getEmenuText() for m in path]
+        path = ".".join(path)
+        return path
+
     def doListCommand(self, cmd, curindex):
         if cmd == "menu-select":
             i = self.getTrueIndex(curindex)
@@ -168,24 +184,12 @@ class CTextMenu(popuplist.CList):
             if mnu.separator: return("next")
             elif mnu.submenu:
                 self.menupath.append(self.curitems[i])
-                self.selectLevel()
+                self.selectLevel(goDown=True)
                 self.setFilter("")
                 self.relayout()
                 return "home"
             else:
-                vim.command("redraw!")
-                # execute menu (with emenu) and "quit"
-                encoding = vim.eval("&encoding")
-                path = [self.menuitems[prnt] for prnt in self.menupath]
-                path.append(mnu)
-                path = [m.getEmenuText() for m in path]
-                path = ".".join(path).encode(encoding)
-                try:
-                    # TODO: implement emenu in a vim function (callback) and use vim.eval.
-                    vim.command('emenu %s' % path)
-                except vim.error:
-                    vim.command("echom 'menu-select: vim.error caught'")
-                return "quit" 
+                return "accept"
         elif cmd == "menu-goback":
             if len(self.menupath) > 0:
                 bkmenu = self.menupath[-1]
@@ -198,8 +202,14 @@ class CTextMenu(popuplist.CList):
                 return ""
         else: return popuplist.CList.doListCommand(self, cmd, curindex)
 
+    def expandVimCommand(self, command, curindex, extraParamHandlers={}):
+        extraParamHandlers["{{menupath}}"] = lambda s,a,i: "'%s'" % (
+            self.getVimMenuPath(self.menupath, self.menuitems[self.curitems[curindex]])
+        ) # TODO: escape string
+        return popuplist.CList.expandVimCommand(self, command, curindex, extraParamHandlers)
+
     def process(self, curindex=0):
         self.menupath = []
-        self.selectLevel()
+        self.selectLevel(goDown=True)
         popuplist.CList.process(self, curindex, startmode=3) # TODO: startmode=sth.QUICK
 

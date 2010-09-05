@@ -92,6 +92,14 @@ finish
          endif
          let files = g:VxPluginVar.vxrecentfile_files
          let idx = index(files, a:filename, 0, g:VxRecentFile_nocase)
+         if idx == -1
+            let rfiles = []
+            for fnm in files
+               call add(rfiles, resolve(fnm))
+            endfor
+            let rfname = resolve(a:filename)
+            let idx = index(rfiles, rfname, 0, g:VxRecentFile_nocase)
+         endif
          if idx == -1 && len(files) >= g:VxRecentFile_size
             let idx = g:VxRecentFile_size - 1
          endif
@@ -112,4 +120,7 @@ finish
    " </STARTUP>
 
    command VxOpenRecentFile call vimuiex#vxrecentfile#VxOpenRecentFile()
+   nmap <silent><unique> <Plug>VxOpenRecentFile :VxOpenRecentFile<cr>
+   imap <silent><unique> <Plug>VxOpenRecentFile <Esc>:VxOpenRecentFile<cr>
+   vmap <silent><unique> <Plug>VxOpenRecentFile :<c-u>VxOpenRecentFile<cr>
 " </VIMPLUGIN>

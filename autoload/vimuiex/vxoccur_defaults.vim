@@ -112,6 +112,22 @@ function! s:BibExtractField(fldname, lnstart, lnend)
 endfunc
 
 "================================================================= 
+" D
+"================================================================= 
+let s:dclass = '^\s*\%(class\|struct\)\s'
+let s:dfunc = '^\s*\%(\w\S*\)\%(\_s\w\S*\)*\_s*(\_[^)]*)\_s*{'
+let s:dkwds = s:ReWords('if|for|foreach|while|catch|do', '|')
+call s:DefRoutines('d', '\m^\s*\%(\%(' . s:dclass . '\)\|\%(' . s:dfunc . '\)\)',
+      \ 'vimuiex#vxoccur_defaults#ExtractD')
+function! vimuiex#vxoccur_defaults#ExtractD()
+   let lnstart = line('.')
+   let line = getline(lnstart)
+   if line =~ s:dclass | return line | endif
+   if line =~ '^\s*\%(' . s:dkwds . '\)' | return '' | endif
+   return line
+endfunc
+
+"================================================================= 
 " Cleanup
 delfunc s:ReWords
 delfunc s:DefRoutines

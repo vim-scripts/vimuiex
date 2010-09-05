@@ -21,32 +21,43 @@ exec vxlib#plugin#MakeSID()
 runtime! menu.vim
 " =========================================================================== 
 
-function! s:GetMenu()
-   " TODO: select the correct menu depending on current mode
-   let lmns = vxlib#cmd#Capture('nmenu', 1)
-   let themenu = []
-   for line in lmns
-      let text = ''
-      let cmd = ''
-      let mtitle = matchstr(line, '^\s*\d\+\s\+.\+') | " space digit space any
-      if mtitle != ''
-         call add(themenu, mtitle)
+function! s:GetMenu(menuPath, vimmode)
+   return vxlib#menu#GetMenuTitles(a:menuPath, a:vimmode)
+endfunc
+
+let s:LastVisual = ''
+function! s:SelectMenu_cb(menupath, mode)
+   " execute emenu for mode that was active before menu was activated
+   if a:mode == 'i'
+      exec "norm! i<c-o>emenu " . a:menupath
+   elseif a:mode == 'v' && s:LastVisual != ''
+      if s:LastVisual != ''
+         exec "norm! `<" . s:LastVisual . "`>"
+         let s:LastVisual = ''
       endif
-   endfor
-   unlet lmns
-   return themenu
+      exec "norm! :`<,`>emenu " . a:menupath
+   else
+      exec 'emenu ' . a:menupath
+   endif
+   return 'q'
 endfunc
 
 " TODO: Remove some top-level entries from the menu (Toolbar, Popup)
 " TODO: Implement a pop-up context menu for textmode
-function! vimuiex#vxtextmenu#VxTextMenu()
-exec 'python def SNR(s): return s.replace("$SNR$", "' . s:SNR . '")'
+function! vimuiex#vxtextmenu#VxTextMenu(menu, mode, ...)
+   exec 'python def SNR(s): return s.replace("$SNR$", "' . s:SNR . '")'
+   if a:0 < 1 | let s:LastVisual = ''
+   else | let s:LastVisual = a:1
+   endif
 
 python << EOF
 import vim
 import vimuiex.textmenu as menu
 Menu = menu.CTextMenu(optid="VxTextMenu")
-Menu.loadMenuItems(SNR("$SNR$GetMenu()"))
+EOF
+   exec 'python Menu.loadMenuItems(SNR("$SNR$GetMenu(''' . a:menu . ''',''' . a:mode . ''')"))'
+   exec 'python Menu.cmdAccept = SNR("$SNR$SelectMenu_cb({{menupath}},''' . a:mode . ''')")'
+python << EOF
 Menu.process(curindex=0)
 Menu=None
 EOF
@@ -59,5 +70,8 @@ endfunc
 finish
 
 " <VIMPLUGIN id="vimuiex#vxtextmenu" require="python&&(!gui_running||python_screen)">
-   command VxTextMenu call vimuiex#vxtextmenu#VxTextMenu()
+   command VxTextMenu call vimuiex#vxtextmenu#VxTextMenu('','n')
+   nmap <silent><unique> <Plug>VxTextMenu :call vimuiex#vxtextmenu#VxTextMenu('','n')<cr>
+   imap <silent><unique> <Plug>VxTextMenu <Esc>:call vimuiex#vxtextmenu#VxTextMenu('','i')<cr>
+   vmap <silent><unique> <Plug>VxTextMenu :<c-u>call vimuiex#vxtextmenu#VxTextMenu('','v',visualmode())<cr>
 " </VIMPLUGIN>

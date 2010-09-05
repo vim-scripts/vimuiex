@@ -52,6 +52,7 @@ class CLineJump:
         return labelsize
 
     def process(self):
+        ioutil.CheckColorScheme()
         nch = self.displayLabels()
         line = 0
         enc = vim.eval("&encoding")
@@ -118,6 +119,7 @@ class CWindowJump:
         return labelsize
 
     def process(self):
+        ioutil.CheckColorScheme()
         nch = self.displayLabels()
         iwin = 0
         enc = vim.eval("&encoding")

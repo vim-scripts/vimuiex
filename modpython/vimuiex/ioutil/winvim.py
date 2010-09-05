@@ -128,3 +128,5 @@ class CScreen(object):
         # self.lastclick = (screen.mousex - self.left, screen.mousey - self.top)
         # print self.lastclick
         return key
+
+
